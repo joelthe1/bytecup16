@@ -62,7 +62,6 @@ q_dict = dict()
 u_dict = dict()
 print "\tcompiling questions..."
 for idx, entry in question_dataframe.iterrows():
-    print "idx:", idx
     f1 = cv_word.transform([re.sub("/"," ", entry['q_word_seq'])])
     f2 = cv_char.transform([re.sub("/"," ", entry['q_char_seq'])])
     f3 =  [entry['q_tag']]

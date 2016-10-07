@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import sys
 import copy
+import re
 from sklearn.feature_extraction.text import CountVectorizer
 from scipy.sparse import csr_matrix, hstack, vstack
 from sklearn.naive_bayes import GaussianNB
@@ -61,10 +62,22 @@ q_dict = dict()
 u_dict = dict()
 print "\tcompiling questions..."
 for idx, entry in question_dataframe.iterrows():
-    q_dict[entry['q_id']] = csr_matrix(hstack([cv_word.fit_transform([" ".join(entry['q_word_seq'].split('/'))]), [entry['q_tag']]]))
+    print "idx:", idx
+    f1 = cv_word.transform([re.sub("/"," ", entry['q_word_seq'])])
+    f2 = cv_char.transform([re.sub("/"," ", entry['q_char_seq'])])
+    f3 =  [entry['q_tag']]
+    f4 = [entry['q_no_upvotes']]
+    f5 = [entry['q_no_answers']]
+    f6 = [entry['q_no_quality_answers']]
+    q_dict[entry['q_id']] = csr_matrix(hstack([f1, f2, f3, f4, f5, f6]))
+
 print "\tcompiling users..."
 for idx, entry in user_dataframe.iterrows():
-    u_dict[entry['u_id']] = csr_matrix(hstack([cv_word.fit_transform([" ".join(entry['e_desc_word_seq'].split('/'))]), cv_topic.fit_transform([" ".join(entry['e_expert_tags'].split('/'))])]))
+    u_column_names = ['u_id','e_expert_tags', 'e_desc_word_seq', 'e_desc_char_seq']
+    f1 = cv_word.transform([re.sub("/", " ", entry['e_desc_word_seq'])])
+    f2 = cv_char.transform([re.sub("/", " ", entry['e_desc_char_seq'])])
+    f3 = cv_topic.transform([re.sub("/", " ", entry['e_expert_tags'])])
+    u_dict[entry['u_id']] = csr_matrix(hstack([f1, f2, f3]))
 
 X = list()
 tempX = list()
@@ -78,7 +91,26 @@ X = csr_matrix(vstack(tempX))
 print "combining data (complete)..."
 
 ###
-# 5. train a Naive Bayes
+# 5. store the matrices
+###
+
+np_mat_file = open("np_mat.dat", 'w')
+np.save(np_mat_file, X.toarray(), allow_pickle=True)
+np_mat_file.close()
+
+def save_sparse_csr(filename,array):
+   np.savez(filename,data = array.data ,indices=array.indices,
+            indptr =array.indptr, shape=array.shape )
+
+def load_sparse_csr(filename):
+   loader = np.load(filename)
+   return csr_matrix((  loader['data'], loader['indices'], loader['indptr']),
+                        shape = loader['shape'])
+
+save_sparse_csr("csr_mat.dat", X)
+
+###
+# 6. train a Naive Bayes
 ###
 print "\ntraining Naive Bayes..."
 gnb = GaussianNB()

@@ -3,6 +3,7 @@ import pandas as pd
 import sys
 import copy
 import re
+import pickle
 from sklearn.feature_extraction.text import CountVectorizer
 from scipy.sparse import csr_matrix, hstack, vstack
 from sklearn.naive_bayes import GaussianNB
@@ -18,7 +19,8 @@ class train_model:
         self.question_dataframe = None
         self.user_dataframe = None
         self.train_info_dataframe = None
-
+        self.test_ids_dataframe = None
+        
         self.word_vocabulary = None
         self.char_vocabulary = None
         self.topic_vocabulary = None
@@ -29,16 +31,19 @@ class train_model:
 
         self.X = None #stored as a CSR Matrix
         self.y = None #stored as an array
-
-    def load_data(self):
+        self.X_test = None
+        
+        
+    def load_data_from_file(self):
         ###
         # 1. Load Data
         ###
         print "\nLoading Data..."
-        question_path = "bytecup2016data/question_info.txt"
-        user_path = "bytecup2016data/user_info.txt"
-        invited_info_path = "bytecup2016data/invited_info_train.txt"
-
+        question_path = "../data/question_info.txt"
+        user_path = "../data/user_info.txt"
+        invited_info_path = "../data/invited_info_train.txt"
+        validate_nolabel_path = "../data/validate_nolabel.pkl"
+        
         q_column_names = ['q_id', 'q_tag', 'q_word_seq', 'q_char_seq', 'q_no_upvotes', 'q_no_answers', 'q_no_quality_answers']
         u_column_names = ['u_id','e_expert_tags', 'e_desc_word_seq', 'e_desc_char_seq']
         train_info_column_names = ['q_id','u_id','answered']
@@ -46,6 +51,7 @@ class train_model:
         self.question_dataframe = pd.read_csv(question_path, names=q_column_names, sep = '\t')
         self.user_dataframe = pd.read_csv(user_path, names = u_column_names, sep = '\t')
         self.train_info_dataframe = pd.read_csv(invited_info_path, names = train_info_column_names, sep = '\t')
+        self.test_ids_dataframe = pd.read_pickle(validate_nolabel_path)
         print "Loading Data (complete)..."
 
     def prepare_vocabulary(self):
@@ -113,8 +119,18 @@ class train_model:
             self.y.append(entry['answered'])
 
         self.X = csr_matrix(vstack(tempX))
+
+        self.X_test = list()
+        tempX = list()
+        print "\tcompiling test info..."
+        for idx, entry in self.test_ids_dataframe.iterrows():
+            tempX.append(csr_matrix(hstack([q_dict[entry['q_id']], u_dict[entry['u_id']]])))
+
+        self.X_test = csr_matrix(vstack(tempX))
+
         print "combining data (complete)..."
 
+        
     def save_sparse_csr(self,filename,array):
         np.savez(filename,data = array.data ,indices=array.indices, indptr =array.indptr, shape=array.shape )
 
@@ -132,13 +148,16 @@ class train_model:
         # 5. store the matrices
         ###
         print "\nsaving  data to file..."
-        #self.save_numpy_mat("np_mat.dat", self.X)
-        self.save_sparse_csr("csr_mat.dat", self.X)
+        self.save_sparse_csr("../data/csr_mat_train.dat", self.X)
+        self.save_sparse_csr("../data/csr_mat_test.dat", self.X_test)
+        pickle.dump(self.y,open("../data/csr_mat_train_y.pkl",'w'))
         print "saving  data to file(complete)..."
 
     def load_data(self):
         print "\nLoading data from file..."
-        self.X = self.load_sparse_csr("csr_mat.dat.npz")
+        self.X = self.load_sparse_csr("../data/csr_mat_train.dat.npz")
+        self.X_test = self.load_sparse_csr("../data/csr_mat_test.dat.npz")
+        self.y = pickle.load(open("../data/csr_mat_train_y.pkl",'r'))
         print "Loading data from file(complete)..."
 
     def train_naive_bayes(self):
@@ -162,41 +181,53 @@ class train_model:
         return lr_model
 
 
-    def save_model(self, model):
+    def save_model(self, model, model_name):
         ###
         # 7. save the trained model to file
         ###
-        print "\saving naive bayes trained model to file..."
-        joblib.dump(model, 'model.pkl') 
-        print "\saving naive bayes trained model to file(complete)..."
+        model_name = model_name + ".pkl"
+        print "\saving", model_name," trained model to file..."
+        joblib.dump(model, '../data/' + model_name) 
+        print "\saving", model_name, " trained model to file(complete)..."
         #clf = joblib.load('filename.pkl')  #to load saved model
 
-    def load_model(self):
-        model = joblib.load('model.pkl')  #to load saved mod
+    def load_model(self, model_name):
+        model_name = model_name + ".pkl"
+        model = joblib.load('../data/'+model_name)  #to load saved mod
         return model
 
     def predict(self,model,X):
+        # entry[0] = probability of class = 0, entry[1] = probability of class =1
         print "\npredicting and saving results..."
         res = model.predict_proba(X.toarray())
         #temp
-        predictions = open('predictions.txt','w')
-        for entry in res:
-            predictions.write(str(entry[0]) + ', '+str(entry[1])+'\n')
+        predictions = open('temp.csv','w')
+        predictions.write('qid,uid,label\n')
+        for i,entry in enumerate(res):
+            predictions.write(str(self.test_ids_dataframe['q_id'][i]) +',' + str(self.test_ids_dataframe['u_id'][i]) +','+str(entry[1])+'\n')
         predictions.close()
         print "\npredicting and saving results(complete)..."
     #def get_important_words():
     #    pass    
 
+#set 1: create and save data
 c = train_model()
-#c.load_data()
+c.load_data_from_file()
 #c.prepare_vocabulary()
 #c.vectorize_data()
 #c.combine_data()
 #c.save_data()
 
-#model = train_naive_bayes()
-#model = c.train_logistic_regression()
-#c.save_model(model)
-model = c.load_model()
+#set 2: load data
 c.load_data()
-c.predict(model, c.X)
+
+#set 3: create and save model
+#model = c.train_logistic_regression()
+#c.save_model(model, "logistic")
+
+model = c.load_model("logistic")
+#print c.X[0]
+#print c.X_test.shape
+
+#set 3: save predict
+c.predict(model, c.X_test)

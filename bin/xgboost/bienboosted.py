@@ -33,7 +33,7 @@ class xgboost_wrapper:
 
     def train_xgboost(self):
         # fit model no training data
-        self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=300, learning_rate=0.03, silent=True, objective='binary:logistic', scale_pos_weight=0.2, eval_metric='auc', gamma=2, min_child_weight=4, max_delta_step=5, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=8.17).fit(self.X, self.y)
+        self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=300, learning_rate=0.03, silent=True, objective='binary:logistic', gamma=2, min_child_weight=4, max_delta_step=5, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=8.17).fit(self.X, self.y)
         print(self.model)
 
     def predict(self):

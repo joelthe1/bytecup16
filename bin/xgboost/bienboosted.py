@@ -1,7 +1,7 @@
 import numpy as np
 import xgboost
 from sklearn import cross_validation
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, f1_score
 from scipy.sparse import csr_matrix
 import pickle
 
@@ -33,7 +33,7 @@ class xgboost_wrapper:
 
     def train_xgboost(self):
         # fit model no training data
-        self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=300, learning_rate=0.05, silent=False, objective='binary:logistic', scale_pos_weight=0.2, eval_metric='auc').Fit(self.X, self.y)
+        self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=300, learning_rate=0.03, silent=True, objective='binary:logistic', scale_pos_weight=0.2, eval_metric='auc', gamma=2, min_child_weight=4, max_delta_step=5, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=8.17).fit(self.X, self.y)
         print(self.model)
 
     def predict(self):
@@ -55,5 +55,6 @@ xg = xgboost_wrapper()
 xg.load_data()
 xg.train_xgboost()
 xg.predict()
+
 
 

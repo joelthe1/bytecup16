@@ -1,3 +1,4 @@
+import pandas as pd
 import numpy as np
 import xgboost
 from sklearn import cross_validation
@@ -13,6 +14,8 @@ class xgboost_wrapper:
         self.y_dev = None
         self.X_test = None
 
+        self.test_ids_dataframe = None
+
         self.model = None;
 
     def load_sparse_csr(self,filename):  
@@ -25,6 +28,7 @@ class xgboost_wrapper:
         self.X = self.load_sparse_csr("../../data/csr_mat_train.dat.npz")
         self.X_test = self.load_sparse_csr("../../data/csr_mat_test.dat.npz").toarray()
         self.y = pickle.load(open("../../data/csr_mat_train_y.pkl",'r'))
+        self.test_ids_dataframe = pd.read_pickle("../../data/validate_nolabel.pkl")
 
         test_size = 0.25
         seed = 7
@@ -38,11 +42,12 @@ class xgboost_wrapper:
 
     def predict(self):
         # make predictions for test data
-        y_pred = self.model.predict(self.X_test)
+        y_pred = self.model.predict_proba(self.X_test)
         wfile = open('temp.csv', 'w')
         wfile.write('qid,uid,label\n')
-        for i,entry in enum(X_test):
-            wfile.write(','.join(entry)+','+ypred[i]+'\n')
+        print y_pred
+        for i,entry in enumerate(y_pred):
+            wfile.write(str(self.test_ids_dataframe['q_id'][i]) +',' + str(self.test_ids_dataframe['u_id'][i]) +','+str(entry[1])+'\n')
 #        print y_pred.shape
 
         

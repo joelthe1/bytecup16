@@ -38,8 +38,13 @@ class xgboost_wrapper:
 
     def predict(self):
         # make predictions for test data
-        y_pred = self.model.predict(self.X_text)
-        print y_pred.shape
+        y_pred = self.model.predict(self.X_test)
+        wfile = open('temp.csv', 'w')
+        wfile.write('qid,uid,label\n')
+        for i,entry in enum(X_test):
+            wfile.write(','.join(entry)+','+ypred[i]+'\n')
+#        print y_pred.shape
+
         
         #predictions = [round(value) for value in y_pred]
         

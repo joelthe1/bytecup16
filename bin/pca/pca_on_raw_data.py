@@ -20,6 +20,10 @@ question_dataframe = pd.read_csv(question_path, names=q_column_names, sep = '\t'
 user_dataframe = pd.read_csv(user_path, names = u_column_names, sep = '\t')
 train_info_dataframe = pd.read_csv(invited_info_path, names = train_info_column_names, sep = '\t')
 
+#NORMALIZE DATA
+for column in ['q_no_upvotes', 'q_no_answers', 'q_no_quality_answers']:
+    question_dataframe[column] = (question_dataframe[column]-question_dataframe[column].mean())/question_dataframe[column].std(ddof=1)
+
 all_word_desc_list = question_dataframe['q_word_seq'].tolist() + user_dataframe['e_desc_word_seq'].tolist()
 all_char_desc_list = question_dataframe['q_char_seq'].tolist() + user_dataframe['e_desc_char_seq'].tolist()
 all_topics_list = question_dataframe['q_tag'].tolist() + user_dataframe['e_expert_tags'].tolist()
@@ -28,7 +32,6 @@ word_vocabulary = set([word for sent in all_word_desc_list for word in str(sent)
 #possible inconsistency in the data ---- char seq np.nan found !
 char_vocabulary = set([char for sent in all_char_desc_list for char in str(sent).split('/')])
 topic_vocabulary = set([char for sent in all_topics_list for char in str(sent).split('/')])
-
 print "Size of the word vocabulary :", len(word_vocabulary)
 print "Size of the char vocabulary :", len(char_vocabulary)
 print "Number of topics : ", len(topic_vocabulary)
@@ -58,14 +61,15 @@ print "question_feature_matrix original shape: ", question_feature_matrix.shape
 
 kernels = ['rbf', 'poly', 'sigmoid', 'cosine', 'linear']
 for k in kernels[:1]:
-    pca = KernelPCA(n_components=None)
+    pca = KernelPCA(kernel=k, n_components=4000)
     pca.fit(question_feature_matrix)
     question_feature_matrix = pca.transform(question_feature_matrix)
     print "\nquestion_feature_matrix : (kernel:{}), (shape:{}) ".format(k, question_feature_matrix.shape)
 
 question_feature_map = {}
-for i, quid in enumerate(question_dataframe['q_id'].tolist()):
-    question_feature_map[quid] = question_feature_matrix[i,:]
+for i, q in question_dataframe.iterrows():
+    question_feature_map[q['q_id']] = np.hstack([question_feature_matrix[i,:], q['q_no_upvotes'],
+                                                 q['q_no_answers'], q['q_no_quality_answers']])
 
 with open('question_features.pkl','wb') as fp:
     cPickle.dump(question_feature_map,fp)
@@ -96,14 +100,14 @@ print "user_feature_matrix original shape: ", user_feature_matrix.shape
 
 kernels = ['rbf', 'poly', 'sigmoid', 'cosine', 'linear']
 for k in kernels[:1]:
-    pca = KernelPCA(n_components=None)
+    pca = KernelPCA(kernel=k, n_components=4000)
     pca.fit(user_feature_matrix)
     user_feature_matrix = pca.transform(user_feature_matrix)
     print "\nuser_feature_matrix : (kernel:{}), (shape:{}) ".format(k, user_feature_matrix.shape)
 
 user_feature_map = {}
-for i, quid in enumerate(user_dataframe['u_id'].tolist()):
-    user_feature_map[quid] = user_feature_matrix[i,:]
+for i, u in user_dataframe.iterrows():
+    user_feature_map[u['u_id']] = user_feature_matrix[i,:]
 
 with open('user_features.pkl','wb') as fp:
     cPickle.dump(user_feature_map,fp)

@@ -25,14 +25,14 @@ class xgboost_wrapper:
     # load data
     def load_data(self):
         print "\nLoading data from file..."
-        self.X = self.load_sparse_csr("../../data/csr_mat_train_pca.dat.npz")
+        self.X = self.load_sparse_csr("../../data/csr_mat_train_pca.dat.npz").toarray()
 #        self.X_test = self.load_sparse_csr("../../data/csr_mat_test_pca.dat.npz").toarray()
         self.y = pickle.load(open("../../data/csr_mat_train_y.pkl",'r'))
-        self.test_ids_dataframe = pd.read_pickle("../../data/validate_nolabel.pkl")
+        #self.test_ids_dataframe = pd.read_pickle("../../data/validate_nolabel.pkl")
 
-        test_size = 0.25
-        seed = 7
-        self.X, self.X_dev, self.y, self.y_dev = cross_validation.train_test_split(self.X, self.y, test_size=test_size, random_state=seed)
+#        test_size = 0.25
+#        seed = 7
+#        self.X, self.X_dev, self.y, self.y_dev = cross_validation.train_test_split(self.X, self.y, test_size=test_size, random_state=seed)
         print "Loading data from file(complete)..."
 
     def fpreproc(self, dtrain, dtest, param):
@@ -44,9 +44,12 @@ class xgboost_wrapper:
     def train_xgboost(self):
         # fit model no training data
         #self.model = xgboost.XGBClassifier(max_depth=6, n_estimators=300, learning_rate=0.02, silent=True, objective='binary:logistic', gamma=0.2, min_child_weight=1, max_delta_step=6, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=8.17).fit(self.X, self.y, eval_metric:'ndcg@10')
-        param = {'max_depth':6, 'n_estimators':300, 'learning_rate':0.02, 'silent':True, 'objective':'binary:logistic', 'gamma':0.2, 'min_child_weight':1, 'max_delta_step':6, 'subsample':0.8, 'reg_lambda':3, 'reg_alpha':1, 'scale_pos_weight':8.17)
-        res = xgboost.cv(param, dtrain, num_boost_round=10, nfold=5, metrics={'ndcg@10'}, seed = 0, callbacks=[xgb.callback.print_evaluation(show_stdv=True)], fpreproc=this.fpreproc)
-        print(self.model)
+        dtrain = xgboost.DMatrix(self.X, label=self.y)
+        self.X = None
+        self.y = None
+        param = {'max_depth':6, 'n_estimators':300, 'learning_rate':0.02, 'silent':True, 'objective':'binary:logistic', 'gamma':0.2, 'min_child_weight':1, 'max_delta_step':6, 'subsample':0.8, 'reg_lambda':3, 'reg_alpha':1, 'scale_pos_weight':8.17}
+        res = xgboost.cv(param, dtrain, num_boost_round=10, nfold=5, stratified=True, metrics={'ndcg@10'}, seed = 0, callbacks=[xgboost.callback.print_evaluation(show_stdv=True)], fpreproc=self.fpreproc)
+        print(res)
 
     def predict(self):
         # make predictions for test data

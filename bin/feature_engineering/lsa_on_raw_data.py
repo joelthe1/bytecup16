@@ -7,6 +7,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.decomposition import PCA, KernelPCA
+from sklearn.preprocessing import Normalizer
 
 
 question_path = "../../data/question_info.txt"
@@ -21,9 +22,6 @@ question_dataframe = pd.read_csv(question_path, names=q_column_names, sep = '\t'
 user_dataframe = pd.read_csv(user_path, names = u_column_names, sep = '\t')
 train_info_dataframe = pd.read_csv(invited_info_path, names = train_info_column_names, sep = '\t')
 
-#NORMALIZE DATA
-for column in ['q_no_upvotes', 'q_no_answers', 'q_no_quality_answers']:
-    question_dataframe[column] = (question_dataframe[column]-question_dataframe[column].mean())/question_dataframe[column].std(ddof=1)
 
 all_word_desc_list = question_dataframe['q_word_seq'].tolist() + user_dataframe['e_desc_word_seq'].tolist()
 all_char_desc_list = question_dataframe['q_char_seq'].tolist() + user_dataframe['e_desc_char_seq'].tolist()
@@ -61,7 +59,8 @@ tf_tags = TfidfTransformer(use_idf=True).fit(tag_counts)
 tag_tfs = tf_tags.transform(tag_counts).toarray()
 print "question tag features", tag_tfs.shape
 
-question_feature_matrix = np.hstack([word_tfs, char_tfs, tag_tfs])
+question_feature_matrix = Normalizer(copy=True).fit_transform(np.hstack([word_tfs, char_tfs, tag_tfs]))
+print question_feature_matrix
 print "question_feature_matrix original shape: ", question_feature_matrix.shape
 
 question_feature_map = {}
@@ -97,7 +96,8 @@ tf_tags = TfidfTransformer(use_idf=True).fit(tag_counts)
 tag_tfs = tf_tags.transform(tag_counts).toarray()
 print "user tag features", tag_tfs.shape
 
-user_feature_matrix = np.hstack([word_tfs, char_tfs, tag_tfs])
+user_feature_matrix = Normalizer(copy=True).fit_transform(np.hstack([word_tfs, char_tfs, tag_tfs]))
+print user_feature_matrix
 print "user_feature_matrix original shape: ", user_feature_matrix.shape
 
 user_feature_map = {}

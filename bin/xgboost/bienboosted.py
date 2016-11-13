@@ -4,7 +4,7 @@ import xgboost
 from sklearn import cross_validation
 from sklearn.grid_search import GridSearchCV
 from sklearn.metrics import accuracy_score, f1_score
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, hstack, vstack
 import pickle
 import sys
 
@@ -57,7 +57,7 @@ class xgboost_wrapper:
         self.X = csr_matrix(vstack(tempX))
         self.save_sparse_csr("../../data/csr_mat_train_lsa.dat", self.X)
 
-        print "combining data (complete)"
+        print "combining data and save(complete)"
         print "\nLoading pca data(complete)"
 
     def compile_pca_test(self):
@@ -70,6 +70,7 @@ class xgboost_wrapper:
 
         self.X_test = csr_matrix(vstack(tempX))
         self.save_sparse_csr("../../data/csr_mat_test_lsa.dat", self.X_test)
+        self.predict(self)
 
 
     def fpreproc(self, dtrain, dtest, param):
@@ -130,11 +131,11 @@ class xgboost_wrapper:
 xg = xgboost_wrapper()
 
 if len(sys.argv) > 1:
-    if sys.argv == 'load':
+    if sys.argv[1] == 'load':
         xg.load_data()
-    elif sys.argv == 'compile':
+    elif sys.argv[1] == 'compile':
         xg.compile_pca_train()
-    elif sys.argv == 'test':
+    elif sys.argv[1] == 'test':
         xg.compile_pca_test()
 else:
     xg.load_data()

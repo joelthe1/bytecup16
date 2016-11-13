@@ -1,0 +1,42 @@
+Loading data from file(complete)...
+Fitting 10 folds for each of 27 candidates, totalling 270 fits
+[CV] n_estimators=10, max_depth=3, min_child_weight=1 ................
+[CV]  n_estimators=10, max_depth=3, min_child_weight=1, score=0.888713 -   6.8s
+[Parallel(n_jobs=1)]: Done   1 out of   1 | elapsed:    6.8s remaining:    0.0s
+[CV] n_estimators=10, max_depth=3, min_child_weight=1 ................
+[CV]  n_estimators=10, max_depth=3, min_child_weight=1, score=0.888794 -   7.0s
+[Parallel(n_jobs=1)]: Done   2 out of   2 | elapsed:   13.8s remaining:    0.0s
+[CV] n_estimators=10, max_depth=3, min_child_weight=1 ................
+[CV]  n_estimators=10, max_depth=3, min_child_weight=1, score=0.888957 -   6.9s
+[Parallel(n_jobs=1)]: Done   3 out of   3 | elapsed:   20.7s remaining:    0.0s
+[CV] n_estimators=10, max_depth=3, min_child_weight=1 ................
+[CV]  n_estimators=10, max_depth=3, min_child_weight=1, score=0.888916 -   7.1s
+[Parallel(n_jobs=1)]: Done   4 out of   4 | elapsed:   27.8s remaining:    0.0s
+[CV] n_estimators=10, max_depth=3, min_child_weight=1 ................
+[CV]  n_estimators=10, max_depth=3, min_child_weight=1, score=0.888952 -   7.1s
+[Parallel(n_jobs=1)]: Done   5 out of   5 | elapsed:   34.9s remaining:    0.0s
+[CV] n_estimators=10, max_depth=3, min_child_weight=1 ................
+[CV]  n_estimators=10, max_depth=3, min_child_weight=1, score=0.888871 -   7.0s
+[Parallel(n_jobs=1)]: Done   6 out of   6 | elapsed:   41.9s remaining:    0.0s
+[CV] n_estimators=10, max_depth=3, min_child_weight=1 ................
+[CV]  n_estimators=10, max_depth=3, min_child_weight=1, score=0.888830 -   7.1s
+[Parallel(n_jobs=1)]: Done   7 out of   7 | elapsed:   49.0s remaining:    0.0s
+[CV] n_estimators=10, max_depth=3, min_child_weight=1 ................
+[CV]  n_estimators=10, max_depth=3, min_child_weight=1, score=0.888830 -   7.0s
+[Parallel(n_jobs=1)]: Done   8 out of   8 | elapsed:   56.0s remaining:    0.0s
+[CV] n_estimators=10, max_depth=3, min_child_weight=1 ................
+[CV]  n_estimators=10, max_depth=3, min_child_weight=1, score=0.888826 -   6.9s
+[Parallel(n_jobs=1)]: Done   9 out of   9 | elapsed:  1.0min remaining:    0.0s
+
+..
+..
+
+[CV] n_estimators=100, max_depth=10, min_child_weight=6 ..............
+[CV]  n_estimators=100, max_depth=10, min_child_weight=6, score=0.903801 - 2.0min
+[CV] n_estimators=100, max_depth=10, min_child_weight=6 ..............
+[CV]  n_estimators=100, max_depth=10, min_child_weight=6, score=0.903597 - 2.0min
+[Parallel(n_jobs=1)]: Done 270 out of 270 | elapsed: 187.3min finished
+score: 0.903007910414
+max_depth: 10
+min_child_weight: 1
+n_estimators: 100

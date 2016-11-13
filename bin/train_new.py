@@ -42,7 +42,7 @@ class train_model:
         question_path = "../data/question_info.txt"
         user_path = "../data/user_info.txt"
         invited_info_path = "../data/invited_info_train.txt"
-        validate_nolabel_path = "../data/validate_nolabel.pkl"
+        validate_nolabel_path = "../data/test_nolabel.pkl"
         
         q_column_names = ['q_id', 'q_tag', 'q_word_seq', 'q_char_seq', 'q_no_upvotes', 'q_no_answers', 'q_no_quality_answers']
         u_column_names = ['u_id','e_expert_tags', 'e_desc_word_seq', 'e_desc_char_seq']
@@ -124,7 +124,7 @@ class train_model:
         tempX = list()
         print "\tcompiling test info..."
         for idx, entry in self.test_ids_dataframe.iterrows():
-            tempX.append(csr_matrix(hstack([q_dict[entry['q_id']], u_dict[entry['u_id']]])))
+            tempX.append(csr_matrix(hstack([q_dict[entry['qid']], u_dict[entry['uid']]])))
 
         self.X_test = csr_matrix(vstack(tempX))
 
@@ -185,7 +185,7 @@ class train_model:
         tempX = list()
         print "\tcompiling test info..."
         for idx, entry in self.test_ids_dataframe.iterrows():
-            tempX.append(csr_matrix(hstack([q_dict[entry['q_id']], u_dict[entry['u_id']]])))
+            tempX.append(csr_matrix(hstack([q_dict[entry['qid']], u_dict[entry['uid']]])))
 
         self.X_test = csr_matrix(vstack(tempX))
 
@@ -214,20 +214,22 @@ class train_model:
         self.X = list()
         tempX = list()
         self.y = list()
-        print "\tcompiling training info..."
+        print "\ncompiling training info..."
         for idx, entry in self.train_info_dataframe.iterrows():
             tempX.append(csr_matrix(hstack([q_dict[entry['q_id']], u_dict[entry['u_id']]])))
             self.y.append(entry['answered'])
 
         self.X = csr_matrix(vstack(tempX))
+        self.save_sparse_csr("../data/csr_mat_train_lsa.dat", self.X)
 
         self.X_test = list()
         tempX = list()
         print "\tcompiling test info..."
         for idx, entry in self.test_ids_dataframe.iterrows():
-            tempX.append(csr_matrix(hstack([q_dict[entry['q_id']], u_dict[entry['u_id']]])))
+            tempX.append(csr_matrix(hstack([q_dict[entry['qid']], u_dict[entry['uid']]])))
 
         self.X_test = csr_matrix(vstack(tempX))
+        self.save_sparse_csr("../data/csr_mat_test_lsa.dat", self.X_test)
 
         print "combining data (complete)..."
 
@@ -277,7 +279,7 @@ class train_model:
         predictions = open('temp.csv','w')
         predictions.write('qid,uid,label\n')
         for i,entry in enumerate(res):
-            predictions.write(str(self.test_ids_dataframe['q_id'][i]) +',' + str(self.test_ids_dataframe['u_id'][i]) +','+str(entry[1])+'\n')
+            predictions.write(str(self.test_ids_dataframe['qid'][i]) +',' + str(self.test_ids_dataframe['uid'][i]) +','+str(entry[1])+'\n')
         predictions.close()
         print "\npredicting and saving results(complete)..."
     #def get_important_words():
@@ -286,10 +288,10 @@ class train_model:
 #set 1: create and save data
 c = train_model()
 c.load_data_from_file()
-#c.prepare_vocabulary()
-#c.vectorize_data()
-#c.combine_data()
-#c.save_data()
+c.prepare_vocabulary()
+c.vectorize_data()
+c.combine_data()
+c.save_data()
 
 #set 2: load data
 #c.load_data()
@@ -298,9 +300,9 @@ c.load_pca_data()
 #model = c.train_logistic_regression()
 #c.save_model(model, "logistic")
 
-model = c.load_model("logistic")
+#model = c.load_model("logistic")
 #print c.X[0]
 #print c.X_test.shape
 
 #set 3: save predict
-c.predict(model, c.X_test)
+#c.predict(model, c.X_test)

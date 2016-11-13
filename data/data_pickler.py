@@ -8,7 +8,11 @@ table.to_pickle('question_info.pkl')
 
 table = pd.read_csv('invited_info_train.txt', sep='\t', header=None, names=['ques_id', 'expert_id', 'answered_bool'])
 table.to_pickle('invited_info_train.pkl')
-'''
+
 table = pd.read_csv('validate_nolabel.txt', header=0)
 table.to_pickle('validate_nolabel.pkl')
+'''
+
+table = pd.read_csv('test_nolabel.txt', header=0)
+table.to_pickle('test_nolabel.pkl')
 

@@ -115,7 +115,7 @@ user_clusters2 = sclustering.labels_
 
 user_feature_map = {}
 for i, u in user_dataframe.iterrows():
-    user_feature_map[u['u_id']] = np.hstack(user_feature_matrix[i,:], user_clusters1, user_clusters2)
+    user_feature_map[u['u_id']] = np.hstack((user_feature_matrix[i,:], user_clusters1, user_clusters2))
 
 with open('user_features.pkl','wb') as fp:
     cPickle.dump(user_feature_map,fp)

@@ -7,6 +7,9 @@ from sklearn.metrics import accuracy_score, f1_score
 from scipy.sparse import csr_matrix, hstack, vstack
 import pickle
 import sys
+sys.path.insert(0, '/home/joelmathew89/zmod/bin/feature_engineering')
+import lsa_and_clustering_on_raw_data as lsa
+
 
 class xgboost_wrapper:
     def __init__(self):
@@ -15,11 +18,16 @@ class xgboost_wrapper:
         self.X_dev = None
         self.y_dev = None
         self.X_test = None
+        self.q_dict = None
+        self.u_dict = None
 
         self.test_ids_dataframe = None
 
         self.model = None;
         self.train_info_dataframe = pd.read_csv("../../data/invited_info_train.txt", names = ['q_id','u_id','answered'], sep = '\t')
+
+    def save_sparse_csr(self,filename,array):
+        np.savez(filename,data = array.data ,indices=array.indices, indptr =array.indptr, shape=array.shape)
 
     def load_sparse_csr(self,filename):  
         loader = np.load(filename)
@@ -37,13 +45,30 @@ class xgboost_wrapper:
 #        self.X, self.X_dev, self.y, self.y_dev = cross_validation.train_test_split(self.X, self.y, test_size=test_size, random_state=seed)
         print "Loading data from file(complete)..."
 
+    def hot_load(self):
+        print "\nHot load."
+        for i in range(5, 7, 1):
+            print '\nRunning for', str([i*100, i*100, i*10])
+            self.q_dict, self.u_dict = lsa.run([i*100, i*100, i*10])
+        
+            self.X = list()
+            tempX = list()
+            self.y = list()
+            print "\ncombining both user and question data..."
+            for idx, entry in self.train_info_dataframe.iterrows():
+                tempX.append(csr_matrix(hstack([self.q_dict[entry['q_id']], self.u_dict[entry['u_id']]])))
+                self.y.append(entry['answered'])
+            self.X = csr_matrix(vstack(tempX))
+            self.train_xgboost()
+        print "\nDone Hot load."
+
     def compile_pca_train(self):
         print "\nLoading pca data..."
         print "Loading user data..."
-        u_dict = pickle.load(open("../../data/user_features.pkl",'r'))
+        self.u_dict = pickle.load(open("../../data/user_features.pkl",'r'))
         print "Loading user data(complete)"
         print "Loading question data..."
-        q_dict = pickle.load(open("../../data/question_features.pkl",'r'))
+        self.q_dict = pickle.load(open("../../data/question_features.pkl",'r'))
         print "Loading question data(complete)"
 
         self.X = list()
@@ -51,7 +76,7 @@ class xgboost_wrapper:
         self.y = list()
         print "\ncombining both user and question data..."
         for idx, entry in self.train_info_dataframe.iterrows():
-            tempX.append(csr_matrix(hstack([q_dict[entry['q_id']], u_dict[entry['u_id']]])))
+            tempX.append(csr_matrix(hstack([self.q_dict[entry['q_id']], self.u_dict[entry['u_id']]])))
             self.y.append(entry['answered'])
 
         self.X = csr_matrix(vstack(tempX))
@@ -61,17 +86,22 @@ class xgboost_wrapper:
         print "\nLoading pca data(complete)"
 
     def compile_pca_test(self):
-        self.test_ids_dataframe = pd.read_pickle("../../data/test_nolabel.pkl")
+        # Compile train data
+        self.compile_pca_train()
+
+        # Compile test data
+        self.test_ids_dataframe = pd.read_pickle("../../data/validate_nolabel.pkl")
         self.X_test = list()
         tempX = list()
         print "\tcompiling test info..."
         for idx, entry in self.test_ids_dataframe.iterrows():
-            tempX.append(csr_matrix(hstack([q_dict[entry['qid']], u_dict[entry['uid']]])))
+            tempX.append(csr_matrix(hstack([self.q_dict[entry['q_id']], self.u_dict[entry['u_id']]])))
 
         self.X_test = csr_matrix(vstack(tempX))
         self.save_sparse_csr("../../data/csr_mat_test_lsa.dat", self.X_test)
-        self.predict(self)
 
+        self.train_xgboost()
+        self.predict()
 
     def fpreproc(self, dtrain, dtest, param):
         label = dtrain.get_label()
@@ -81,15 +111,15 @@ class xgboost_wrapper:
 
     def train_xgboost(self):
         # fit model no training data
-#        self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=100, learning_rate=0.08, silent=True, objective='binary:logistic', gamma=0.2, min_child_weight=1, max_delta_step=6, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=1).fit(self.X, self.y, eval_metric='auc')
+        self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=300, learning_rate=0.02, silent=True, objective='binary:logistic', gamma=0.2, min_child_weight=1, max_delta_step=6, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=1).fit(self.X, self.y, eval_metric='auc')
 
-        dtrain = xgboost.DMatrix(self.X, label=self.y)
-        self.X = None
-        self.y = None
-        param = {'max_depth':10, 'n_estimators':100, 'learning_rate':0.08, 'silent':True, 'objective':'binary:logistic', 'gamma':0.2, 'min_child_weight':1, 'max_delta_step':6, 'subsample':0.8, 'reg_lambda':3, 'reg_alpha':1, 'scale_pos_weight':1}
-        res = xgboost.cv(param, dtrain, num_boost_round=10, nfold=5, stratified=True, metrics={'auc'}, seed = 0, callbacks=[xgboost.callback.print_evaluation(show_stdv=True)])
-#        #fpreproc=self.fpreproc
-        print(res)
+#        dtrain = xgboost.DMatrix(self.X, label=self.y)
+#        self.X = None
+#        self.y = None
+#        param = {'max_depth':10, 'n_estimators':300, 'learning_rate':0.02, 'silent':True, 'objective':'binary:logistic', 'gamma':0.2, 'min_child_weight':1, 'max_delta_step':6, 'subsample':0.8, 'reg_lambda':3, 'reg_alpha':1, 'scale_pos_weight':1}
+#        res = xgboost.cv(param, dtrain, num_boost_round=10, nfold=5, stratified=True, metrics={'auc'}, seed = 0, callbacks=[xgboost.callback.print_evaluation(show_stdv=True)])
+##        #fpreproc=self.fpreproc
+#        print(res)
 
 #        clf = GridSearchCV(
 #            self.model,
@@ -113,7 +143,7 @@ class xgboost_wrapper:
         wfile = open('temp.csv', 'w')
         wfile.write('qid,uid,label\n')
         for i,entry in enumerate(y_pred):
-            wfile.write(str(self.test_ids_dataframe['qid'][i]) +',' + str(self.test_ids_dataframe['uid'][i]) +','+str(entry[1])+'\n')
+            wfile.write(str(self.test_ids_dataframe['q_id'][i]) +',' + str(self.test_ids_dataframe['u_id'][i]) +','+str(entry[1])+'\n')
         print y_pred.shape
 
         
@@ -137,8 +167,10 @@ if len(sys.argv) > 1:
         xg.compile_pca_train()
     elif sys.argv[1] == 'test':
         xg.compile_pca_test()
+    elif sys.argv[1] == 'grid':
+        xg.hot_load()
 else:
     xg.load_data()
 
-xg.train_xgboost()
+#xg.train_xgboost()
 #xg.predict()

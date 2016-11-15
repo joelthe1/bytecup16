@@ -9,7 +9,7 @@ import pickle
 import sys
 sys.path.insert(0, '/home/joelmathew89/zmod/bin/feature_engineering')
 import lsa_and_clustering_on_raw_data as lsa
-
+import pca_on_raw_data as pca_feats
 
 class xgboost_wrapper:
     def __init__(self):
@@ -37,8 +37,9 @@ class xgboost_wrapper:
     def load_data(self):
         print "\nLoading data from file..."
         self.X = self.load_sparse_csr("../../data/csr_mat_train_lsa.dat.npz").toarray()
-#        self.X_test = self.load_sparse_csr("../../data/csr_mat_test_lsa.dat.npz").toarray()
+        self.X_test = self.load_sparse_csr("../../data/csr_mat_test_lsa.dat.npz").toarray()
         self.y = pickle.load(open("../../data/csr_mat_train_y.pkl",'r'))
+        self.test_ids_dataframe = pd.read_pickle("../../data/validate_nolabel.pkl")
 
 #        test_size = 0.25
 #        seed = 7
@@ -47,19 +48,30 @@ class xgboost_wrapper:
 
     def hot_load(self):
         print "\nHot load."
-        for i in range(5, 7, 1):
-            print '\nRunning for', str([i*100, i*100, i*10])
-            self.q_dict, self.u_dict = lsa.run([i*100, i*100, i*10])
+#        for i in range(5, 7, 1):
+#            print '\nRunning for', str([i*100, i*100, i*10])
+#            self.q_dict, self.u_dict = lsa.run([i*100, i*100, i*10])
+#        
+#            self.X = list()
+#            tempX = list()
+#            self.y = list()
+#            print "\ncombining both user and question data..."
+#            for idx, entry in self.train_info_dataframe.iterrows():
+#                tempX.append(csr_matrix(hstack([self.q_dict[entry['q_id']], self.u_dict[entry['u_id']]])))
+#                self.y.append(entry['answered'])
+
+        self.q_dict, self.u_dict = pca_feats.run()
         
-            self.X = list()
-            tempX = list()
-            self.y = list()
-            print "\ncombining both user and question data..."
-            for idx, entry in self.train_info_dataframe.iterrows():
-                tempX.append(csr_matrix(hstack([self.q_dict[entry['q_id']], self.u_dict[entry['u_id']]])))
-                self.y.append(entry['answered'])
-            self.X = csr_matrix(vstack(tempX))
-            self.train_xgboost()
+        self.X = list()
+        tempX = list()
+        self.y = list()
+        print "\ncombining both user and question data..."
+        for idx, entry in self.train_info_dataframe.iterrows():
+            tempX.append(csr_matrix(hstack([self.q_dict[entry['q_id']], self.u_dict[entry['u_id']]])))
+            self.y.append(entry['answered'])
+            
+        self.X = csr_matrix(vstack(tempX))
+        self.train_xgboost()
         print "\nDone Hot load."
 
     def compile_pca_train(self):
@@ -111,15 +123,15 @@ class xgboost_wrapper:
 
     def train_xgboost(self):
         # fit model no training data
-        self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=300, learning_rate=0.02, silent=True, objective='binary:logistic', gamma=0.2, min_child_weight=1, max_delta_step=6, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=1).fit(self.X, self.y, eval_metric='auc')
+        #self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=300, learning_rate=0.02, silent=True, objective='binary:logistic', gamma=0.2, min_child_weight=1, max_delta_step=6, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=1).fit(self.X, self.y, eval_metric='auc')
 
-#        dtrain = xgboost.DMatrix(self.X, label=self.y)
-#        self.X = None
-#        self.y = None
-#        param = {'max_depth':10, 'n_estimators':300, 'learning_rate':0.02, 'silent':True, 'objective':'binary:logistic', 'gamma':0.2, 'min_child_weight':1, 'max_delta_step':6, 'subsample':0.8, 'reg_lambda':3, 'reg_alpha':1, 'scale_pos_weight':1}
-#        res = xgboost.cv(param, dtrain, num_boost_round=10, nfold=5, stratified=True, metrics={'auc'}, seed = 0, callbacks=[xgboost.callback.print_evaluation(show_stdv=True)])
-##        #fpreproc=self.fpreproc
-#        print(res)
+        dtrain = xgboost.DMatrix(self.X, label=self.y)
+        self.X = None
+        self.y = None
+        param = {'max_depth':10, 'n_estimators':300, 'learning_rate':0.02, 'silent':True, 'objective':'binary:logistic', 'gamma':0.2, 'min_child_weight':1, 'max_delta_step':6, 'subsample':0.8, 'reg_lambda':3, 'reg_alpha':1, 'scale_pos_weight':1}
+        res = xgboost.cv(param, dtrain, num_boost_round=10, nfold=5, stratified=True, metrics={'auc'}, seed = 0, callbacks=[xgboost.callback.print_evaluation(show_stdv=True)])
+#        #fpreproc=self.fpreproc
+        print(res)
 
 #        clf = GridSearchCV(
 #            self.model,

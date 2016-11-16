@@ -50,9 +50,9 @@ class loadData:
 
         question_word_tfidf_vectors = self._tfidf(self.word_vocabulary, self.questions['q_word_seq'].tolist(), (1, 2))
         question_tag_vectors = self._tfidf(self.topic_vocabulary, self.questions['q_tag'].astype('str').tolist())
+        print 'running question NMF...'        
         lda_tag_tfidf_vectors = NMF(n_components=components).fit_transform(
             np.hstack([question_tag_vectors, question_word_tfidf_vectors]))
-        print 'running question NMF...'
         numeric_question_vectors = Normalizer().fit_transform(self.questions.as_matrix(['q_no_upvotes', 'q_no_answers',
                                                                                         'q_no_quality_answers']))
         question_feature_matrix = np.hstack([lda_tag_tfidf_vectors, numeric_question_vectors])

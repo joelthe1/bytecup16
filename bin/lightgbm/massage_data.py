@@ -9,6 +9,7 @@ import lsa
 train_info_dataframe = pd.read_csv("../../data/invited_info_train.txt", names = ['q_id','u_id','answered'], sep = '\t')
 validate_ids_dataframe = pd.read_pickle("../../data/validate_nolabel.pkl")
 
+
 print "\n Loading data mapings"
 n_comp = [500, 500, 20, 700, 700, 20]
 q_dict, u_dict = lsa.run(n_comp)
@@ -17,8 +18,6 @@ print "Loading data mapings(complete)"
 print "\ncombining both user and question data..."
 
 for i,data_source in enumerate([train_info_dataframe, validate_ids_dataframe]):
-    if i==0:
-        continue
     res_bclass = []
     res_rank = []
     res_reg = []
@@ -44,26 +43,43 @@ for i,data_source in enumerate([train_info_dataframe, validate_ids_dataframe]):
         #x = map(lambda (i, x): '{}:{:.18f}'.format((i+1), x) if x!=0 else 0, enumerate(line[0]))
         #x = filter(lambda x: type(x) == str, x)
         #t = '\t'.join(x)
-        #    t = str(entry['answered']) + '\t' + '\t'.join(x)
+        #    t = str(entry['answered']) + '\t'.join(x)
         # res_rank.append(t)
 
     if i == 0:
+        print "\nsplitting data into training and validation set..."
+        #split training data into training and validation sets
+        n = len(res_bclass)
+        #do a 80-20 split
+        m = int(0.2 * n)
+        v_idx = np.random.randint(n, size=m)
+        vset = list()
+        tset = list()
+        for i in range(n):
+            if i in v_idx:
+                vset.append(res_bclass[i])
+            else:
+                tset.append(res_bclass[i])
+
+        print "splitting data into training and validation set(comleted)..."
+                
+        print "\nsaving training set to file..."
         wfile = open('bien_bclassifier.train', 'w')
-        wfile.write('\n'.join(res_bclass))
+        wfile.write('\n'.join(tset))
         wfile.close()
+        print "saving training set to file(complete)..."
+
+        print "\nsaving validation set to file..."
+        wfile = open('bien_bclassifier.val', 'w')
+        wfile.write('\n'.join(vset))
+        wfile.close()
+        print "saving validation set to file(complete)..."
     else:
+        print "\nsaving test set to file..."
         wfile = open('bien_bclassifier.test', 'w')
         wfile.write('\n'.join(res_bclass))
         wfile.close
-'''
-wfile = open('bien_rank.test', 'w')
-wfile.write('\n'.join(res_rank))
-wfile.close()
-
-wfile = open('bien_regression.test', 'w')
-wfile.write('\n'.join(res_reg))
-wfile.close()
-'''
+        print "saving test set to file(complete)..."
 
 print "combining data and save(complete)"
 print "\nLoading pca data(complete)"

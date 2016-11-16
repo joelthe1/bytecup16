@@ -43,7 +43,7 @@ class loadData:
         tf_vectors = TfidfTransformer(use_idf=True, norm='l2').fit_transform(count_vectors)
         return tf_vectors.todense()
 
-    def nmf(self, components=50):
+    def nmf(self, components=100):
         '''
         Returns question_feature_dict and user_feature_dict
         '''
@@ -71,7 +71,7 @@ class loadData:
 
         return question_feature_map, user_feature_map
 
-    def pca(self, components=.95):
+    def pca(self, components=(4400, 4300)):
         '''
         Performs linear PCA and returns question_feature_dict and user_feature_dict
         '''
@@ -80,13 +80,13 @@ class loadData:
         numeric_question_vectors = Normalizer().fit_transform(self.questions.as_matrix(['q_no_upvotes', 'q_no_answers',
                                                                                         'q_no_quality_answers']))
         print 'running question PCA...'
-        question_feature_matrix = PCA(n_components=components).fit_transform(np.hstack([question_word_tfidf_vectors,
+        question_feature_matrix = PCA(n_components=components[0]).fit_transform(np.hstack([question_word_tfidf_vectors,
                                                                                         question_tag_vectors,
                                                                                         numeric_question_vectors]))
         user_word_tfidf_vectors = self._tfidf(self.word_vocabulary, self.users['e_desc_word_seq'].tolist(), (1, 2))
         user_tag_vectors = self._tfidf(self.topic_vocabulary, self.users['e_expert_tags'].tolist())
         print 'running user PCA...'
-        user_feature_matrix = PCA(n_components=components).fit_transform(
+        user_feature_matrix = PCA(n_components=components[1], svd_solver='randomized').fit_transform(
             np.hstack([user_word_tfidf_vectors, user_tag_vectors]))
         print 'question_shape:{}, user_shape:{}'.format(question_feature_matrix.shape, user_feature_matrix.shape)
         user_feature_map = {}
@@ -101,5 +101,5 @@ class loadData:
 
 if __name__ == '__main__':
     data = loadData('../../data')
-    data.nmf()
     data.pca()
+    data.nmf()

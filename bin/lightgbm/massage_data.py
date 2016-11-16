@@ -8,16 +8,16 @@ import lsa
 
 train_info_dataframe = pd.read_csv("../../data/invited_info_train.txt", names = ['q_id','u_id','answered'], sep = '\t')
 validate_ids_dataframe = pd.read_pickle("../../data/validate_nolabel.pkl")
-
+test_ids_dataframe = pd.read_pickle("../../data/test_nolabel.pkl")
 
 print "\n Loading data mapings"
-n_comp = [500, 500, 20, 700, 700, 20]
+n_comp = [500, 500, 20, 700, 700, 30]
 q_dict, u_dict = lsa.run(n_comp)
 print "Loading data mapings(complete)"
 
 print "\ncombining both user and question data..."
 
-for i,data_source in enumerate([train_info_dataframe, validate_ids_dataframe]):
+for i,data_source in enumerate([train_info_dataframe, validate_ids_dataframe, test_ids_dataframe]):
     res_bclass = []
     res_rank = []
     res_reg = []
@@ -31,6 +31,7 @@ for i,data_source in enumerate([train_info_dataframe, validate_ids_dataframe]):
             res_bclass.append(str(entry['answered']) + '\t' + '\t'.join(x_bclass))  #training data
         else:
             res_bclass.append('\t'.join(x_bclass))                          #test data
+            
         
         # Regression
         #x_reg = map(lambda x: '{:.18f}'.format(x), line[0])
@@ -74,12 +75,18 @@ for i,data_source in enumerate([train_info_dataframe, validate_ids_dataframe]):
         wfile.write('\n'.join(vset))
         wfile.close()
         print "saving validation set to file(complete)..."
-    else:
+    elif i == 1:
         print "\nsaving test set to file..."
         wfile = open('bien_bclassifier.test', 'w')
         wfile.write('\n'.join(res_bclass))
         wfile.close
         print "saving test set to file(complete)..."
+    elif i == 2:
+        print "\nsaving final test file..."
+        wfile = open('bien_bclassifier.final', 'w')
+        wfile.write('\n'.join(res_bclass))
+        wfile.close
+        print "saving final test file(complete)..."
 
 print "combining data and save(complete)"
 print "\nLoading pca data(complete)"

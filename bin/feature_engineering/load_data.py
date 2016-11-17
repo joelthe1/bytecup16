@@ -62,6 +62,19 @@ class loadData:
         user_feature_matrix = NMF(n_components=components).fit_transform(
             np.hstack([user_word_tfidf_vector, user_tag_vectors]))
         print 'question_shape:{}, user_shape:{}'.format(question_feature_matrix.shape, user_feature_matrix.shape)
+        return question_feature_matrix, user_feature_matrix
+
+    def nmf_array(self, components=100):
+        '''
+        return array features
+        '''
+        return self.nmf(components)
+    
+    def nmf_dict(self, components=100):
+        '''
+        return dict of nmf features
+        '''
+        question_feature_matrix, user_feature_matrix = self.nmf(components)
         user_feature_map = {}
         question_feature_map = {}
         for i, u in self.users.iterrows():
@@ -89,6 +102,16 @@ class loadData:
         user_feature_matrix = PCA(n_components=components[1], svd_solver='randomized').fit_transform(
             np.hstack([user_word_tfidf_vectors, user_tag_vectors]))
         print 'question_shape:{}, user_shape:{}'.format(question_feature_matrix.shape, user_feature_matrix.shape)
+        return question_feature_matrix, user_feature_matrix
+
+    def pca_array(self, components=(4400, 4300)):
+        return self.pca(components)
+        
+    def pca_dict(self, components=(4400, 4300)):
+        '''
+        return dict of question and user features.
+        '''
+        question_feature_matrix, user_feature_matrix = self.pca(components)
         user_feature_map = {}
         question_feature_map = {}
         for i, u in self.users.iterrows():
@@ -98,7 +121,39 @@ class loadData:
 
         return question_feature_map, user_feature_map
 
+    def raw_training_data(self):
+        '''
+        return training data in numpy.array format.
+        '''
+        Xtrain = []
+        ytrain = []
+        for i, t in self.train.iterrows():
+            Xtrain.append([t['q_id'], t['u_id']])
+            ytrain.append(int(t['answered']))
+        return np.array(Xtrain), np.array(ytrain)
 
+    def training_features(self, method='pca'):
+        '''
+        return question_features, user_features, labesl in np.array format 
+        '''
+        question_features = []
+        user_features = []
+        labels = []
+
+        if method == 'pca':
+            q_map, u_map = self.pca_dict()
+        elif method == 'nmf':
+            q_map, u_map = self.nmf_dict()
+        else:
+            print 'Error: method not defined'
+            return
+        
+        for i, t in self.train.iterrows():
+            labels.append(int(t['answered']))
+            question_features.append(q_map[t['q_id']])
+            user_features.append(u_map[t['u_id']])
+        return np.array(question_features), np.array(user_features), np.array(labels)
+    
 if __name__ == '__main__':
     data = loadData('../../data')
     data.pca()

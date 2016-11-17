@@ -25,14 +25,14 @@ from feature_engineering.load_data import loadData
 
 
 NUM_THREADS = 24
-NUM_COMPONENTS = 35
-NUM_EPOCHS = 45
+NUM_COMPONENTS = 75
+NUM_EPOCHS = 50
 ITEM_ALPHA = 1e-4
 USER_ALPHA = 1e-4
 
 data = loadData('../../data')
 X, y = data.raw_training_data()
-question_features, user_features = data.nmf_array(components=25)
+question_features, user_features = data.nmf_array(components=100)
 q_index_map = {q['q_id']:i  for i,q in data.questions.iterrows()}
 u_index_map = {u['u_id']:i  for i,u in data.users.iterrows()}
 
@@ -97,9 +97,10 @@ for train_index, test_index in skf.split(X, y):
 
 print 'cross-validation mean AUC on test: {}'.format(np.mean(auc))
 
-exit()
 
-with open(validation_nolabel_path, 'r') as f:
+print 'Generating temp.csv on validation_nolabel.txt'
+validate_nolabel_path = "../../data/validate_nolabel.txt"
+with open(validate_nolabel_path, 'r') as f:
     lines = f.readlines()
     Xtest = []
     row = []
@@ -109,7 +110,7 @@ with open(validation_nolabel_path, 'r') as f:
         line = line.strip()
         qid = line.split(',')[0]
         uid = line.split(',')[1]
-        Xtest.append([uid, qid])
+        Xtest.append([qid, uid])
     for i,XV in enumerate(X):
         row.append(u_index_map[XV[1]])
         column.append(q_index_map[XV[0]])

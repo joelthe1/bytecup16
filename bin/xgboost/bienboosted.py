@@ -3,13 +3,13 @@ import numpy as np
 import xgboost
 from sklearn import cross_validation
 from sklearn.grid_search import GridSearchCV
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.model_selection import StratifiedKFold
 from scipy.sparse import csr_matrix, hstack, vstack
 import pickle
 import sys
-sys.path.insert(0, '/home/joelmathew89/zmod/bin/feature_engineering')
-import lsa_and_clustering_on_raw_data as lsa
-import pca_on_raw_data as pca_feats
+sys.path.insert(0, '../feature_engineering')
+from load_data import loadData
 
 class xgboost_wrapper:
     def __init__(self):
@@ -122,16 +122,29 @@ class xgboost_wrapper:
         return (dtrain, dtest, param)
 
     def train_xgboost(self):
-        # fit model no training data
-        #self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=300, learning_rate=0.02, silent=True, objective='binary:logistic', gamma=0.2, min_child_weight=1, max_delta_step=6, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=1).fit(self.X, self.y, eval_metric='auc')
 
-        dtrain = xgboost.DMatrix(self.X, label=self.y)
-        self.X = None
-        self.y = None
-        param = {'max_depth':10, 'n_estimators':300, 'learning_rate':0.02, 'silent':True, 'objective':'binary:logistic', 'gamma':0.2, 'min_child_weight':1, 'max_delta_step':6, 'subsample':0.8, 'reg_lambda':3, 'reg_alpha':1, 'scale_pos_weight':1}
-        res = xgboost.cv(param, dtrain, num_boost_round=10, nfold=5, stratified=True, metrics={'auc'}, seed = 0, callbacks=[xgboost.callback.print_evaluation(show_stdv=True)])
-#        #fpreproc=self.fpreproc
-        print(res)
+        data = loadData('../../data')
+        
+        q_mat, u_mat, self.y = data.training_features(method='nmf')
+        self.X = np.hstack([q_mat, u_mat])
+        skf = StratifiedKFold(n_splits=5, random_state=2016)
+        for train_index, test_index in skf.split(self.X, self.y):
+            Xtrain, ytrain = self.X[train_index], self.y[train_index]
+            Xtest, ytest = self.X[test_index], self.y[test_index]
+            print Xtrain.shape, ytrain.shape
+
+            # fit model no training data
+            self.model = xgboost.XGBClassifier(max_depth=10, n_estimators=100, learning_rate=0.08, silent=True, objective='binary:logistic', gamma=0.2, min_child_weight=1, max_delta_step=6, subsample=0.8, reg_lambda=3, reg_alpha=1, scale_pos_weight=1).fit(Xtrain, ytrain, eval_set=[(Xtrain, ytrain), (Xtest, ytest)], eval_metric='auc', verbose=True)
+            break
+#            print self.model.evals_result()
+
+#         dtrain = xgboost.DMatrix(self.X, label=self.y)
+#         self.X = None
+#         self.y = None
+#         param = {'max_depth':10, 'n_estimators':300, 'learning_rate':0.02, 'silent':True, 'objective':'binary:logistic', 'gamma':0.2, 'min_child_weight':1, 'max_delta_step':6, 'subsample':0.8, 'reg_lambda':3, 'reg_alpha':1, 'scale_pos_weight':1}
+#         res = xgboost.cv(param, dtrain, num_boost_round=10, nfold=5, stratified=True, metrics={'auc'}, seed = 0, callbacks=[xgboost.callback.print_evaluation(show_stdv=True)])
+# #        #fpreproc=self.fpreproc
+#         print(res)
 
 #        clf = GridSearchCV(
 #            self.model,
@@ -181,8 +194,8 @@ if len(sys.argv) > 1:
         xg.compile_pca_test()
     elif sys.argv[1] == 'grid':
         xg.hot_load()
-else:
-    xg.load_data()
+# else:
+#     xg.load_data()
 
-#xg.train_xgboost()
+xg.train_xgboost()
 #xg.predict()

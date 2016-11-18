@@ -175,7 +175,7 @@ class loadData:
         question_features = normalize(self.questions.as_matrix(['q_no_upvotes',
                                                            'q_no_answers',
                                                            'q_no_quality_answers']),axis=0)
-        question_features = np.hstack(question_features, self.question_cosine_similarity())
+        question_features = np.hstack([question_features, self.question_cosine_similarity()])
         user_feat_map = {u['u_id']:i for i,u in self.users.iterrows()}
         question_feat_map = {q['q_id']:i for i,q in self.questions.iterrows()}
 

@@ -13,8 +13,9 @@ from load_data import loadData
 
 class xgboost_wrapper:
     def __init__(self):
-        self.X = None
-        self.y = None
+        data = loadData('../../data')
+        q_mat, u_mat, self.y = data.training_features()
+        self.X = np.hstack([q_mat, u_mat])
         self.X_dev = None
         self.y_dev = None
         self.X_test = None
@@ -35,29 +36,6 @@ class xgboost_wrapper:
                        'reg_alpha':1,
                        'scale_pos_weight':1}
 
-    def setup(self):
-        data = loadData('../../data')
-        tag_vector = data._tag_vectors()
-        u_q_median = data._user_question_median_score()
-        features = np.hstack([tag_vector, u_q_median])
-        u_feat = {}
-        self.y = np.array(data.train['answered'].tolist())
-                
-        for i, u in data.users.iterrows():
-            u_feat[u['u_id']] = features[i,:]
-
-        self.X = []
-        for i, t in data.train.iterrows():
-            self.X.append(u_feat[t['u_id']])
-            
-        self.X = np.array(self.X)
-
-        # self.validate_ids_dataframe = pd.read_pickle("../../data/validate_nolabel.pkl")
-        # self.X_test = []
-        # for idx, entry in self.validate_ids_dataframe.iterrows():
-        #     self.X_test.append(u_feat[entry['u_id']])
-        # self.X_test = np.array(self.X_test)
-
     def cross_validate(self):
         dtrain = xgboost.DMatrix(self.X, label=self.y)
         skf = StratifiedKFold(n_splits=5, random_state=2016)
@@ -67,7 +45,7 @@ class xgboost_wrapper:
             print Xtrain.shape, ytrain.shape
 
             self.model = xgboost.XGBClassifier(**self.params).fit(Xtrain, ytrain, eval_set=[(Xtrain, ytrain), (Xtest, ytest)], eval_metric='auc', verbose=True)
-#            print self.model.evals_result()
+            print self.model.evals_result()
             break
 
     def grid_search(self):
@@ -97,6 +75,5 @@ class xgboost_wrapper:
 
 if __name__ == '__main__':
     xg = xgboost_wrapper()
-    xg.setup()
     xg.cross_validate()
 

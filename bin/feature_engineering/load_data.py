@@ -18,10 +18,14 @@ class loadData:
                            'q_no_quality_answers']
         usercolumns = ['u_id', 'e_expert_tags', 'e_desc_word_seq', 'e_desc_char_seq']
         traincolumns = ['q_id', 'u_id', 'answered']
+        validcolumns = ['q_id', 'u_id']
+        testcolumns = ['q_id', 'u_id']
 
         self.questions = pd.read_csv(path + "/question_info.txt", names=questioncolumns, sep='\t')
         self.users = pd.read_csv(path + "/user_info.txt", names=usercolumns, sep='\t')
         self.train = pd.read_csv(path + "/invited_info_train.txt", names=traincolumns, sep='\t')
+        self.validation = pd.read_csv(path + "/validate_nolabel.txt", names=validcolumns, sep=',', skiprows=1)
+        self.test = pd.read_csv(path + "/test_nolabel.txt", names=testcolumns, sep=',', skiprows=1)
         self._vocabulary()
 
     def __repr__(self):
@@ -165,7 +169,7 @@ class loadData:
         return np.absolute(question_similarity)
 
     
-    def training_features(self, method=''):
+    def training_features(self, method='', other=None):
         '''
         return question_features, user_features, labesl in np.array format 
         '''
@@ -178,6 +182,16 @@ class loadData:
         user_feat_map = {u['u_id']:i for i,u in self.users.iterrows()}
         question_feat_map = {q['q_id']:i for i,q in self.questions.iterrows()}
 
+        # return the features for validation or test files
+        if other is not None:
+            c_user_features = []
+            c_question_features = []
+            data = self.test if other is 'test' else self.validation
+            for i, t in data.iterrows():
+                c_question_features.append(question_features[question_feat_map[t['q_id']], :])
+                c_user_features.append(user_features[user_feat_map[t['u_id']], :])
+            return np.array(c_question_features), np.array(c_user_features)
+                
         train_user_features = []
         train_question_features = []
         labels = []
@@ -191,8 +205,8 @@ if __name__ == '__main__':
     data = loadData('../../data')
     data.user_cosine_similarity()
     data.question_cosine_similarity()
-    q, u, l = data.training_features()
-    print q.shape, u.shape, l.shape
+    data.training_features()
+
                                       
 
                                       

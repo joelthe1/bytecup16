@@ -162,3 +162,22 @@ alpha = 15
 user_vecs, item_vecs = implicit.alternating_least_squares((data_train*alpha).astype('double'),factors=20,regularization = 0.2,iterations = 50)
 print calc_mean_auc(data_train, data_users_altered,[sparse.csr_matrix(user_vecs), sparse.csr_matrix(item_vecs.T)], data_test)
 # AUC for our recommender system
+
+print "shape of user_vecs:", user_vecs.shape
+print "shape of item_vecs:", item_vecs.shape
+
+user_cat_mapping = dict(zip(data.uid, rows))
+question_cat_mapping = dict(zip(data.qid, cols))
+
+#data['val'] = data['label']
+
+print "\ncalculating and saving feature vector to file..."
+vals = list()
+#print "number or rows:", data.size
+for i,row in data.iterrows():
+    #print "row:", row
+    vals.append(np.dot(user_vecs[user_cat_mapping[row['uid']],:],item_vecs.T)[question_cat_mapping[row['qid']]])
+
+ofile = open('../../data/cf_vec.txt', 'w')
+ofile.write('\n'.join(map(str, vals)))
+ofile.close()

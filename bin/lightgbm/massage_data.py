@@ -7,15 +7,11 @@ import sys
 sys.path.insert(0, '../feature_engineering')
 from load_data import loadData
 
-train_info_dataframe = pd.read_csv("../../data/invited_info_train.txt", names = ['q_id','u_id','answered'], sep = '\t')
-validate_ids_dataframe = pd.read_pickle("../../data/validate_nolabel.pkl")
-test_ids_dataframe = pd.read_pickle("../../data/test_nolabel.pkl")
-
 data = loadData('../../data')
-q_mat, u_mat, y = data.training_features(method='nmf')
-tag_vector = data._tag_vectors()
-u_q_median = data._user_question_median_score()
-X = np.hstack([q_mat, u_mat, tag_vector, u_q_median])
+q_mat, u_mat, y = data.training_features()
+
+train_data = np.hstack([q_mat, u_mat])
+
 skf = StratifiedKFold(n_splits=5, random_state=2016)
 count = 0
 for train_index, test_index in skf.split(X, y):

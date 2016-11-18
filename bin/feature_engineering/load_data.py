@@ -6,7 +6,7 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.lda import LDA
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import NMF
-from scipy.stats import zscore
+from scipy.stats import zscore, kurtosis
 
 class loadData:
     '''
@@ -89,13 +89,19 @@ class loadData:
                 user_question_train_map_zero.setdefault(t['u_id'], []).append(question_tag_map[t['q_id']])
         user_question_median_features = []
         for i, u in self.users.iterrows():
-            questions_answered = user_question_train_map_one.get(u['u_id'], [[0,0,0]])
-            questions_answered = np.median(np.array(questions_answered), axis=0)
-            questions_not_answered = user_question_train_map_zero.get(u['u_id'], [[0,0,0]])
-            questions_not_answered = np.median(np.array(questions_not_answered), axis=0)
-            user_features_template = np.hstack([questions_answered,questions_not_answered])
+            q_answered = np.array(user_question_train_map_one.get(u['u_id'], [[0,0,0]]))
+            q_not = np.array(user_question_train_map_zero.get(u['u_id'], [[0,0,0]]))
+            user_features_template = np.hstack([np.median(q_answered, axis=0),
+                                                np.mean(q_answered, axis=0),
+                                                np.ndarray.min(q_answered, axis=0),
+                                                np.ndarray.max(q_answered, axis=0),
+                                                kurtosis(q_answered, axis=0),
+                                                np.median(q_not, axis=0),
+                                                np.mean(q_not, axis=0),
+                                                np.ndarray.min(q_not, axis=0),
+                                                np.ndarray.max(q_not, axis=0),
+                                                kurtosis(q_not, axis=0)])
             user_question_median_features.append(user_features_template)
-
         return normalize(axis=0, X=np.array(user_question_median_features))
             
     def user_tag_vectors_dict(self):
@@ -110,18 +116,19 @@ class loadData:
         return user_tag_vector_map
                 
 
-    def weighted_word_vectors(self):
+    def weighted_word_vectors(self, pca=None):
         '''
         Return tf-idf count vectors back.
         '''
-        question_word_tfidf_vectors = self._tfidf(self.word_vocabulary, self.questions['q_word_seq'].tolist(), (1, 2))
-        numeric_question_vectors = normalize(axis=0, X=self.questions.as_matrix(['q_no_upvotes', 'q_no_answers',
-                                                                                        'q_no_quality_answers']))
-        question_feature_matrix = np.hstack([question_word_tfidf_vectors, numeric_question_vectors])
-        user_word_tfidf_vector = self._tfidf(self.word_vocabulary, self.users['e_desc_word_seq'].tolist(), (1, 2))
-        user_tag_vectors = self._tag_vectors()
-        user_feature_matrix = np.hstack([user_word_tfidf_vector, user_tag_vectors])
-        return question_feature_matrix, user_feature_matrix
+        question_word_feature_vectors = self._tfidf(self.word_vocabulary, self.questions['q_word_seq'].tolist(), (1, 2))
+        user_word_feature_vectors = self._tfidf(self.word_vocabulary, self.users['e_desc_word_seq'].tolist(), (1, 2))
+        if pca is None:
+            return question_word_feature_vectors, user_word_feature_vectors
+        else:
+            assert type(pca)==tuple
+            question_word_features = PCA(n_components=pca[0]).fit_transform(question_word_feature_vectors)
+            user_word_features = PCA(n_components=pca[1]).fit_transform(user_word_feature_vectors)
+            return question_word_features, user_word_features
 
     def nmf(self, components=100):
         '''

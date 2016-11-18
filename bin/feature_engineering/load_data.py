@@ -3,7 +3,6 @@ import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.lda import LDA
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import NMF
 from scipy.stats import zscore, kurtosis
@@ -174,7 +173,7 @@ class loadData:
                                    self.user_tag_vectors()])
         question_features = normalize(self.questions.as_matrix(['q_no_upvotes',
                                                            'q_no_answers',
-                                                           'q_no_quality_answers']),axis=0)
+                                                                'q_no_quality_answers','q_tag']),axis=0)
         question_features = np.hstack([question_features, self.question_cosine_similarity()])
         user_feat_map = {u['u_id']:i for i,u in self.users.iterrows()}
         question_feat_map = {q['q_id']:i for i,q in self.questions.iterrows()}

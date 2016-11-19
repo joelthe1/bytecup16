@@ -85,6 +85,22 @@ class loadData:
             user_tag_features.append(tag_vector_template)
         return normalize(axis=0, X=np.array(user_tag_features))
 
+    def question_tag_features(self):
+        tag_question_map = {}
+        for i,q in self.questions.iterrows():
+            tag_question_map.setdefault(q['q_tag'], []).append([q['q_no_upvotes'],
+                                                                q['q_no_answers'],q['q_no_quality_answers']])
+        tag_feature_matrix = []
+        for tag in self.questions['q_tag'].tolist():
+            tag_features = np.array(tag_question_map[tag])
+            tag_features_template = np.hstack([np.mean(tag_features, axis=0),
+                                               np.median(tag_features, axis=0),
+                                               np.ndarray.min(tag_features, axis=0),
+                                               np.ndarray.max(tag_features, axis=0),
+                                               kurtosis(tag_features, axis=0)])
+            tag_feature_matrix.append(tag_features_template)
+        return np.array(tag_feature_matrix)
+
     def user_question_score(self):
         '''
         Return the median of upvotes,ans,no_quality_ans, the questions answered by a user.
@@ -237,7 +253,9 @@ class loadData:
                                               (len(self.questions),1))
         question_features = np.hstack([question_features,question_tag_vectors,
                                        question_length_vectors,
+                                       self.question_tag_features(),
                                        question_quality_vectors])
+        
         # question_features = np.hstack([question_features, self.question_cosine_similarity()])
         # question_features = np.hstack([question_latent_features, question_features])
 
@@ -272,9 +290,10 @@ class loadData:
     
 if __name__ == '__main__':
     data = loadData('../../data')
-    data.latent_factors()
-    data.user_cosine_similarity()
-    data.question_cosine_similarity()
+    # data.latent_factors()
+    # data.user_cosine_similarity()
+    # data.question_cosine_similarity()
+    # print data.question_tag_features().shape
     data.training_features()
 
 

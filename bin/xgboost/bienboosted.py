@@ -16,16 +16,20 @@ class xgboost_wrapper:
         data = loadData('../../data')
         q_mat, u_mat, self.y = data.training_features()
         self.X = np.hstack([q_mat, u_mat])
-        self.X_dev = None
-        self.y_dev = None
-        self.X_test = None
-        self.validte_ids_dataframe = None
 
+        # valid_q_mat, valid_u_mat = data.training_features(other='validation')
+        # self.X_valid = np.hstack([valid_q_mat, valid_u_mat])
+        # self.validate_ids_dataframe = data.validation
+        
+        # test_q_mat, test_u_mat = data.training_features(other='test')
+        # self.X_test = np.hstack([test_q_mat, test_u_mat])
+        # self.test_ids_df = data.test
+        
         self.model = None;
         
         self.params = {'max_depth':10,
-                       'n_estimators':300,
-                       'learning_rate':0.02,
+                       'n_estimators':285,
+                       'learning_rate':0.03,
                        'silent':True,
                        'objective':'binary:logistic',
                        'gamma':0.2,
@@ -39,35 +43,45 @@ class xgboost_wrapper:
     def cross_validate(self):
         dtrain = xgboost.DMatrix(self.X, label=self.y)
         skf = StratifiedKFold(n_splits=5, random_state=2016)
+        i = -1
         for train_index, test_index in skf.split(self.X, self.y):
+            # i += 1
+            # if i == 0:
+            #     continue
             Xtrain, ytrain = self.X[train_index], self.y[train_index]
             Xtest, ytest = self.X[test_index], self.y[test_index]
             print Xtrain.shape, ytrain.shape
 
-            self.model = xgboost.XGBClassifier(**self.params).fit(Xtrain, ytrain, eval_set=[(Xtrain, ytrain), (Xtest, ytest)], eval_metric='auc', verbose=True)
+            self.model = xgboost.XGBClassifier(**self.params).fit(Xtrain, ytrain, eval_set=[(Xtrain, ytrain), (Xtest, ytest)], eval_metric='auc', verbose=True, early_stopping_rounds=10)
             print self.model.evals_result()
-            break
+#            break
 
     def grid_search(self):
-       xg_grid = GridSearchCV(
-           self.model,
-           {
-               'max_depth': [3, 6, 10],
-               'n_estimators': [10,50,100],
-               'min_child_weight': [1,3,6]
-           },
-           cv=10,
-           verbose=10
-       )
-       xg_grid.fit(self.X, self.y)
-       best_param, score, _ = max(clf.grid_scores_, key=lambda x:x[1])
-       print 'score:',score
-       for param_name in sorted(best_param.keys()):
-           print("%s: %r" % (param_name, best_param[param_name]))
+        self.model = xgboost.XGBClassifier(**self.params)
+        xg_grid = GridSearchCV(
+            self.model,
+            {
+                'learning_rate': [0.01, 0.5, 0.1, 0.2, 0.3]
+            },
+            cv=3,
+            verbose=10,
+            n_jobs=2
+        )
+        xg_grid.fit(self.X, self.y)
+        print xg_grid.best_params_
+        
+        best_param, score, _ = max(xg_grid.grid_scores_, key=lambda x:x[1])
+        print 'score:',score
+        for param_name in sorted(best_param.keys()):
+            print("%s: %r" % (param_name, best_param[param_name]))
 
     def predict_validation(self):
         self.model = xgboost.XGBClassifier(**self.params).fit(self.X, self.y)
-        y_pred = self.model.predict_proba(self.X_dev)
+
+        np.savetxt('imp_weigts.txt', np.array(self.model.feature_importances_))
+        return
+    
+        y_pred = self.model.predict_proba(self.X_valid)
         wfile = open('temp.csv', 'w')
         wfile.write('qid,uid,label\n')
         for i,entry in enumerate(y_pred):
@@ -75,5 +89,9 @@ class xgboost_wrapper:
 
 if __name__ == '__main__':
     xg = xgboost_wrapper()
-    xg.cross_validate()
+#    xg.cross_validate()
+#    xg.predict_validation()
+    xg.grid_search()
+#    xg.predict_validation()
+
 

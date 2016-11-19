@@ -6,6 +6,8 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import NMF
 from scipy.stats import zscore, kurtosis
+import scipy.sparse
+from lightfm import LightFM
 
 class loadData:
     '''
@@ -158,27 +160,52 @@ class loadData:
         print 'question_shape:{}, user_shape:{}'.format(question_feature_matrix.shape, user_feature_matrix.shape)
         return question_feature_matrix, user_feature_matrix
 
-    def user_cosine_similarity(self):
+    def user_cosine_similarity(self, components=1000):
         tfidf_vectors = self._tfidf(self.word_vocabulary, self.users['e_desc_word_seq'].tolist(), (1, 1))
         user_similarity = (tfidf_vectors*tfidf_vectors.T).A
-        return np.absolute(user_similarity)
+        return PCA(n_components=components, svd_solver='randomized').fit_transform(np.absolute(user_similarity))
 
     def question_cosine_similarity(self):
         tfidf_vectors = self._tfidf(self.word_vocabulary, self.questions['q_word_seq'].tolist(), (1, 1))
         question_similarity = (tfidf_vectors*tfidf_vectors.T).A
         return np.absolute(question_similarity)
 
-    
+    def latent_factors(self):
+        '''
+        returns question, user latent factors using LightFM
+        '''
+        q_index_map = {q['q_id']:i  for i,q in self.questions.iterrows()}
+        u_index_map = {u['u_id']:i  for i,u in self.users.iterrows()}
+        X = self.train.as_matrix(['q_id','u_id'])
+        y = np.array(self.train['answered'].tolist())
+        row = []
+        column = []
+        data = []
+        for i, XV in enumerate(X):
+            row.append(u_index_map[XV[1]])
+            column.append(q_index_map[XV[0]])
+            data.append(int(y[i]))
+        train_matrix = scipy.sparse.csr_matrix((data, (row, column)),
+                                               shape=(len(self.users),len(self.questions)))
+        model = LightFM(loss='warp-kos', max_sampled=15, no_components=10)
+        model.fit(train_matrix, epochs=10, num_threads=24)
+        return model.user_embeddings, model.item_embeddings
+        
+
     def training_features(self, method='', other=None):
         '''
         return question_features, user_features, labesl in np.array format 
         '''
+        user_latent_features, question_latent_features = self.latent_factors()
         user_features = np.hstack([self.user_question_score(),
                                    self.user_tag_vectors()])
+        user_features = np.hstack([user_latent_features, user_features])
         question_features = normalize(self.questions.as_matrix(['q_no_upvotes',
-                                                           'q_no_answers',
-                                                                'q_no_quality_answers','q_tag']),axis=0)
+                                                                'q_no_answers',
+                                                                'q_no_quality_answers',
+                                                                'q_tag']),axis=0)
         question_features = np.hstack([question_features, self.question_cosine_similarity()])
+        question_features = np.hstack([question_latent_features, question_features])
         user_feat_map = {u['u_id']:i for i,u in self.users.iterrows()}
         question_feat_map = {q['q_id']:i for i,q in self.questions.iterrows()}
 
@@ -203,6 +230,7 @@ class loadData:
     
 if __name__ == '__main__':
     data = loadData('../../data')
+    data.latent_factors()
     data.user_cosine_similarity()
     data.question_cosine_similarity()
     data.training_features()

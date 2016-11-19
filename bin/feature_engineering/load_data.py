@@ -142,6 +142,22 @@ class loadData:
         print 'question_shape:{}, user_shape:{}'.format(question_feature_matrix.shape, user_feature_matrix.shape)
         return question_feature_matrix, user_feature_matrix
 
+    def _do_share_tag(self, users, questions):
+        assert len(users) == len(questions)
+        common_map = {}
+        user_tag_map = {}
+        question_tag_map = {}
+        for i, u in self.users.iterrows():
+            user_tag_map[u['u_id']] = u['e_expert_tags'].split('/')
+        for i, q in self.questions.iterrows():
+            question_tag_map[q['q_id']] = str(q['q_tag'])
+        for i, t in self.train.iterrows():
+            common_map.setdefault(t['u_id'],{})[t['q_id']] = question_tag_map[t['q_id']] in user_tag_map[t['u_id']]
+        do_share_info = []
+        for i in range(len(users)):
+           do_share_info.append(common_map[users[i]][questions[i]])
+        return np.reshape(map(lambda x:int(x), do_share_info), (len(users),1))
+        
     def pca(self, components=(4400, 4300)):
         '''
         Performs linear PCA and returns question_feature_dict and user_feature_dict
@@ -194,18 +210,26 @@ class loadData:
 
     def training_features(self, method='', other=None):
         '''
-        return question_features, user_features, labesl in np.array format 
+        return features, label (X, y)
         '''
+
+        # -------- USER FEATURES ---------------
         user_latent_features, question_latent_features = self.latent_factors()
         user_features = np.hstack([self.user_question_score(),
                                    self.user_tag_vectors()])
-        user_features = np.hstack([user_latent_features, user_features])
+        # user_features = np.hstack([user_latent_features, user_features])
+
+
+        # -------- QUESTION FEATURES --------------
         question_features = normalize(self.questions.as_matrix(['q_no_upvotes',
                                                                 'q_no_answers',
-                                                                'q_no_quality_answers',
-                                                                'q_tag']),axis=0)
-        question_features = np.hstack([question_features, self.question_cosine_similarity()])
-        question_features = np.hstack([question_latent_features, question_features])
+                                                                'q_no_quality_answers']),axis=0)
+        question_tag_vectors = np.array(self._count_vector(self.topic_vocabulary,
+                                                           map(lambda x:str(x), self.questions['q_tag'].tolist())))
+        question_features = np.hstack([question_features,question_tag_vectors])
+        # question_features = np.hstack([question_features, self.question_cosine_similarity()])
+        # question_features = np.hstack([question_latent_features, question_features])
+
         user_feat_map = {u['u_id']:i for i,u in self.users.iterrows()}
         question_feat_map = {q['q_id']:i for i,q in self.questions.iterrows()}
 
@@ -217,7 +241,9 @@ class loadData:
             for i, t in data.iterrows():
                 c_question_features.append(question_features[question_feat_map[t['q_id']], :])
                 c_user_features.append(user_features[user_feat_map[t['u_id']], :])
-            return np.array(c_question_features), np.array(c_user_features)
+            common_tag_info = self._do_share_tag(data['u_id'].tolist(), data['q_id'].tolist())
+            return np.hstack([np.array(c_question_features),
+                              np.array(c_user_features), common_tag_info]), []
                 
         train_user_features = []
         train_question_features = []
@@ -225,8 +251,13 @@ class loadData:
         for i, t in self.train.iterrows():
             train_question_features.append(question_features[question_feat_map[t['q_id']], :])
             train_user_features.append(user_features[user_feat_map[t['u_id']], :])
-            labels.append(int(t['answered']))        
-        return np.array(train_question_features), np.array(train_user_features), np.array(labels)
+            labels.append(int(t['answered']))
+        
+        # ------- COMMON FEATURES ----------
+        common_tag_info = self._do_share_tag(self.train['u_id'].tolist(), self.train['q_id'].tolist())
+        
+        return np.hstack([np.array(train_question_features),
+                          np.array(train_user_features), common_tag_info]), np.array(labels)
     
 if __name__ == '__main__':
     data = loadData('../../data')
@@ -234,6 +265,7 @@ if __name__ == '__main__':
     data.user_cosine_similarity()
     data.question_cosine_similarity()
     data.training_features()
+
 
                                       
 

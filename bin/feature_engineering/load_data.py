@@ -71,14 +71,42 @@ class loadData:
         for i, u in self.users.iterrows():
             questions_answered = user_question_train_map_one.get(u['u_id'], [])
             questions_not_answered = user_question_train_map_zero.get(u['u_id'], [])
-            tag_vector_template = np.zeros(len(self.topic_vocabulary))
+            tag_vector_template = np.zeros(len(self.topic_vocabulary)+3)
             for q in questions_answered:
                 tag_vector_template[tag_index_map[question_tag_map[q]]] += 1
             for q in questions_not_answered:
                 tag_vector_template[tag_index_map[question_tag_map[q]]] += -1
+            # add 3 features --- number of questions answered,
+            # number of questions not answered,
+            # total expert tags per user
+            tag_vector_template[-3] = len(questions_answered)
+            tag_vector_template[-2] = len(questions_not_answered)
+            tag_vector_template[-1] = len(u['e_expert_tags'].split('/'))            
             user_tag_features.append(tag_vector_template)
- 
         return normalize(axis=0, X=np.array(user_tag_features))
+
+    def question_tag_features(self):
+        tag_question_map = {}
+        tag_total_answers = {}
+        for i,q in self.questions.iterrows():
+            tag_question_map.setdefault(q['q_tag'], []).append([q['q_no_upvotes'],
+                                                                q['q_no_answers'],q['q_no_quality_answers']])
+            tag_total_answers.setdefault(q['q_tag'], 0)
+            tag_total_answers[q['q_tag']] += 1
+        tag_total_array = []
+        tag_feature_matrix = []
+        for tag in self.questions['q_tag'].tolist():
+            tag_features = np.array(tag_question_map[tag])
+            tag_features_template = np.hstack([np.mean(tag_features, axis=0),
+                                               np.median(tag_features, axis=0),
+                                               np.ndarray.min(tag_features, axis=0),
+                                               np.ndarray.max(tag_features, axis=0),
+                                               kurtosis(tag_features, axis=0)])
+            tag_feature_matrix.append(tag_features_template)
+            tag_total_array.append(tag_total_answers[tag])
+            
+        return np.hstack([np.array(tag_feature_matrix),
+                          np.reshape(tag_total_array, (len(self.questions),1))])
 
     def user_question_score(self):
         '''
@@ -226,7 +254,15 @@ class loadData:
                                                                 'q_no_quality_answers']),axis=0)
         question_tag_vectors = np.array(self._count_vector(self.topic_vocabulary,
                                                            map(lambda x:str(x), self.questions['q_tag'].tolist())))
-        question_features = np.hstack([question_features,question_tag_vectors])
+        question_length_vectors = np.reshape([ len(each.split('/')) for each in self.questions['q_word_seq'].tolist()]
+                                    , (len(self.questions),1))
+        question_quality_vectors = np.reshape([q/float(a) for a,q in self.questions.as_matrix(['q_no_answers', 'q_no_quality_answers'])],
+                                              (len(self.questions),1))
+        question_features = np.hstack([question_features,question_tag_vectors,
+                                       question_length_vectors,
+                                       self.question_tag_features(),
+                                       question_quality_vectors])
+        
         # question_features = np.hstack([question_features, self.question_cosine_similarity()])
         # question_features = np.hstack([question_latent_features, question_features])
 
@@ -261,9 +297,10 @@ class loadData:
     
 if __name__ == '__main__':
     data = loadData('../../data')
-    data.latent_factors()
-    data.user_cosine_similarity()
-    data.question_cosine_similarity()
+    # data.latent_factors()
+    # data.user_cosine_similarity()
+    # data.question_cosine_similarity()
+    # print data.question_tag_features().shape
     data.training_features()
 
 

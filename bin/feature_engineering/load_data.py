@@ -245,7 +245,7 @@ class loadData:
         user_latent_features, question_latent_features = self.latent_factors()
         user_features = np.hstack([self.user_question_score(),
                                    self.user_tag_vectors()])
-        # user_features = np.hstack([user_latent_features, user_features])
+        user_features = np.hstack([user_features, user_latent_features])
 
 
         # -------- QUESTION FEATURES --------------
@@ -256,7 +256,7 @@ class loadData:
                                                            map(lambda x:str(x), self.questions['q_tag'].tolist())))
         question_length_vectors = np.reshape([ len(each.split('/')) for each in self.questions['q_word_seq'].tolist()]
                                     , (len(self.questions),1))
-        question_quality_vectors = np.reshape([q/float(a) for a,q in self.questions.as_matrix(['q_no_answers', 'q_no_quality_answers'])],
+        question_quality_vectors = np.reshape([q/float(a) if a>0 else 0.0 for a,q in self.questions.as_matrix(['q_no_answers', 'q_no_quality_answers'])],
                                               (len(self.questions),1))
         question_features = np.hstack([question_features,question_tag_vectors,
                                        question_length_vectors,
@@ -264,7 +264,7 @@ class loadData:
                                        question_quality_vectors])
         
         # question_features = np.hstack([question_features, self.question_cosine_similarity()])
-        # question_features = np.hstack([question_latent_features, question_features])
+        question_features = np.hstack([question_features, question_latent_features])
 
         user_feat_map = {u['u_id']:i for i,u in self.users.iterrows()}
         question_feat_map = {q['q_id']:i for i,q in self.questions.iterrows()}
@@ -277,6 +277,7 @@ class loadData:
             for i, t in data.iterrows():
                 c_question_features.append(question_features[question_feat_map[t['q_id']], :])
                 c_user_features.append(user_features[user_feat_map[t['u_id']], :])
+            #  -------- COMMON FEATURES ---------
             common_tag_info = self._do_share_tag(data['u_id'].tolist(), data['q_id'].tolist())
             return np.hstack([np.array(c_question_features),
                               np.array(c_user_features), common_tag_info]), []
@@ -300,7 +301,7 @@ if __name__ == '__main__':
     # data.latent_factors()
     # data.user_cosine_similarity()
     # data.question_cosine_similarity()
-    # print data.question_tag_features().shape
+    # print data.question_tag_features()
     data.training_features()
 
 

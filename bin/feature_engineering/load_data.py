@@ -179,12 +179,13 @@ class loadData:
             user_tag_map[u['u_id']] = u['e_expert_tags'].split('/')
         for i, q in self.questions.iterrows():
             question_tag_map[q['q_id']] = str(q['q_tag'])
-        for i, t in self.train.iterrows():
-            common_map.setdefault(t['u_id'],{})[t['q_id']] = question_tag_map[t['q_id']] in user_tag_map[t['u_id']]
+        for i, u in self.users.iterrows():
+            for j, q in self.questions.iterrows():
+                common_map.setdefault(u['u_id'],{})[q['q_id']] = int(question_tag_map[q['q_id']] in user_tag_map[u['u_id']])
         do_share_info = []
         for i in range(len(users)):
            do_share_info.append(common_map[users[i]][questions[i]])
-        return np.reshape(map(lambda x:int(x), do_share_info), (len(users),1))
+        return np.reshape(do_share_info, (len(users),1))
         
     def pca(self, components=(4400, 4300)):
         '''

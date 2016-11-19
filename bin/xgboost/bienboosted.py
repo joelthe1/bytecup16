@@ -29,7 +29,7 @@ class xgboost_wrapper:
         self.model = None;
         
         self.params = {'max_depth':11,
-                       'n_estimators':180,
+                       'n_estimators':120,
                        'learning_rate':0.2,
                        'silent':True,
                        'objective':'binary:logistic',
@@ -105,20 +105,21 @@ class xgboost_wrapper:
             print("%s: %r" % (param_name, best_param[param_name]))
 
     def predict_validation(self):
-        self.model = xgboost.XGBClassifier(**self.params).fit(self.X, self.y, early_stopping_rounds=10, eval_metric='auc', verbose=True)
+        self.model = xgboost.XGBClassifier(**self.params).fit(self.X, self.y)
 
         # np.savetxt('imp_weigts.txt', np.array(self.model.feature_importances_))
         # return
         
         print 'Predicting validation.'
         y_pred = self.model.predict_proba(self.X_valid)
+        print y_pred
         print 'completed.. Predicting validation.'
 
         print 'Writing out validation.'
         wfile = open('temp.csv', 'w')
         wfile.write('qid,uid,label\n')
         for i,entry in enumerate(y_pred):
-            wfile.write(str(self.validate_ids_dataframe['q_id'][i]) +',' + str(self.validate_ids_dataframe['u_id'][i]) +','+str(entry[1])+'\n')
+            wfile.write(str(self.validate_ids_dataframe['q_id'][i]) +',' + str(self.validate_ids_dataframe['u_id'][i]) +',{0:.20f}\n'.format(entry[1]))
         wfile.close()
         print 'Completed.. writing out validation.'
 
@@ -130,7 +131,7 @@ class xgboost_wrapper:
         wfile = open('final.csv', 'w')
         wfile.write('qid,uid,label\n')
         for i,entry in enumerate(y_pred):
-            wfile.write(str(self.test_ids_df['q_id'][i]) +',' + str(self.test_ids_df['u_id'][i]) +','+str(entry[1])+'\n')
+            wfile.write(str(self.test_ids_df['q_id'][i]) +',' + str(self.test_ids_df['u_id'][i]) +',{0:.20f}\n'.format(entry[1]))
         wfile.close()
         print 'Completed.. Writing out test.'
 

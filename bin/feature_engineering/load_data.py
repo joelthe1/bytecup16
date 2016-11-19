@@ -87,9 +87,13 @@ class loadData:
 
     def question_tag_features(self):
         tag_question_map = {}
+        tag_total_answers = {}
         for i,q in self.questions.iterrows():
             tag_question_map.setdefault(q['q_tag'], []).append([q['q_no_upvotes'],
                                                                 q['q_no_answers'],q['q_no_quality_answers']])
+            tag_total_answers.setdefault(q['q_tag'], 0)
+            tag_total_answers[q['q_tag']] += 1
+        tag_total_array = []
         tag_feature_matrix = []
         for tag in self.questions['q_tag'].tolist():
             tag_features = np.array(tag_question_map[tag])
@@ -99,7 +103,10 @@ class loadData:
                                                np.ndarray.max(tag_features, axis=0),
                                                kurtosis(tag_features, axis=0)])
             tag_feature_matrix.append(tag_features_template)
-        return np.array(tag_feature_matrix)
+            tag_total_array.append(tag_total_answers[tag])
+            
+        return np.hstack([np.array(tag_feature_matrix),
+                          np.reshape(tag_total_array, (len(self.questions),1))])
 
     def user_question_score(self):
         '''

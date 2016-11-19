@@ -10,12 +10,18 @@ import pickle
 import sys
 sys.path.insert(0, '../feature_engineering')
 from load_data import loadData
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+import os
+import errno
+import datetime
+
 
 class xgboost_wrapper:
     def __init__(self):
         data = loadData('../../data')
-        q_mat, u_mat, self.y = data.training_features()
-        self.X = np.hstack([q_mat, u_mat])
+        self.X, self.y = data.training_features()
 
         # valid_q_mat, valid_u_mat = data.training_features(other='validation')
         # self.X_valid = np.hstack([valid_q_mat, valid_u_mat])
@@ -27,8 +33,8 @@ class xgboost_wrapper:
         
         self.model = None;
         
-        self.params = {'max_depth':10,
-                       'n_estimators':285,
+        self.params = {'max_depth':6,
+                       'n_estimators':100,
                        'learning_rate':0.03,
                        'silent':True,
                        'objective':'binary:logistic',
@@ -40,12 +46,38 @@ class xgboost_wrapper:
                        'reg_alpha':1,
                        'scale_pos_weight':1}
 
+    def make_dir(self, path):
+        try:
+            os.makedirs(path)
+        except OSError as exception:
+            if exception.errno != errno.EEXIST:
+                raise
+
+    def genstats(self, info, iteration, dirname):
+        self.make_dir(dirname)
+        wfile = open('{}/stats_cv_{}.out'.format(dirname, iteration), 'w')
+	for vset in info:
+            for loss in info[vset]:
+                y =info[vset][loss]
+                plt.plot(y)
+                plt.xticks(np.arange(0, len(y)+1, 10.0))
+
+                max_val = float('-inf')
+                for i,x in enumerate(y):
+                    if max_val < x:
+                        max_val = x
+                        idx = i
+                wfile.write('max is '+ str(max_val) + ' at ' + str(idx))
+        plt.savefig('{}/plot_cv_{}.png'.format(dirname, iteration), bbox_inches='tight')
+        wfile.close()
+
     def cross_validate(self):
+        time_now = '%s' % datetime.datetime.now()
         dtrain = xgboost.DMatrix(self.X, label=self.y)
         skf = StratifiedKFold(n_splits=5, random_state=2016)
         i = -1
         for train_index, test_index in skf.split(self.X, self.y):
-            # i += 1
+            i += 1
             # if i == 0:
             #     continue
             Xtrain, ytrain = self.X[train_index], self.y[train_index]
@@ -54,7 +86,8 @@ class xgboost_wrapper:
 
             self.model = xgboost.XGBClassifier(**self.params).fit(Xtrain, ytrain, eval_set=[(Xtrain, ytrain), (Xtest, ytest)], eval_metric='auc', verbose=True, early_stopping_rounds=10)
             print self.model.evals_result()
-#            break
+            self.genstats(self.model.evals_result(), i, time_now)
+            break
 
     def grid_search(self):
         self.model = xgboost.XGBClassifier(**self.params)
@@ -65,7 +98,7 @@ class xgboost_wrapper:
             },
             cv=3,
             verbose=10,
-            n_jobs=2
+            n_jobs=1
         )
         xg_grid.fit(self.X, self.y)
         print xg_grid.best_params_
@@ -89,9 +122,8 @@ class xgboost_wrapper:
 
 if __name__ == '__main__':
     xg = xgboost_wrapper()
-#    xg.cross_validate()
-#    xg.predict_validation()
-    xg.grid_search()
+    xg.cross_validate()
+#    xg.grid_search()
 #    xg.predict_validation()
 
 

@@ -28,6 +28,7 @@ class loadData:
         self.train = pd.read_csv(path + "/invited_info_train.txt", names=traincolumns, sep='\t')
         self.validation = pd.read_csv(path + "/validate_nolabel.txt", names=validcolumns, sep=',', skiprows=1)
         self.test = pd.read_csv(path + "/test_nolabel.txt", names=testcolumns, sep=',', skiprows=1)
+        self.common_map = None
         self._vocabulary()
 
     def __repr__(self):
@@ -172,19 +173,31 @@ class loadData:
 
     def _do_share_tag(self, users, questions):
         assert len(users) == len(questions)
-        common_map = {}
+        if self.common_map is not None:
+            print 'using pre-computed common-tag features...'
+            do_share_info = []
+            for i in range(len(users)):
+                do_share_info.append(self.common_map[users[i]][questions[i]])
+            return np.reshape(do_share_info, (len(users),1))
+        print 'computing common-tag features...'
+        self.common_map = {}
+
         user_tag_map = {}
         question_tag_map = {}
-        for i, u in self.users.iterrows():
+        for i,u in self.users.iterrows():
             user_tag_map[u['u_id']] = u['e_expert_tags'].split('/')
-        for i, q in self.questions.iterrows():
+        for i,q in self.questions.iterrows():
             question_tag_map[q['q_id']] = str(q['q_tag'])
-        for i, u in self.users.iterrows():
-            for j, q in self.questions.iterrows():
-                common_map.setdefault(u['u_id'],{})[q['q_id']] = int(question_tag_map[q['q_id']] in user_tag_map[u['u_id']])
+
+        reduced_combinations = np.vstack([self.train.as_matrix(['u_id', 'q_id']),
+                                         self.validation.as_matrix(['u_id', 'q_id']),
+                                         self.test.as_matrix(['u_id', 'q_id'])])
+        print '\tshape of reduced_combinations:',reduced_combinations.shape
+        for u,q in reduced_combinations:
+            self.common_map.setdefault(u,{})[q] = int(question_tag_map[q] in user_tag_map[u])
         do_share_info = []
         for i in range(len(users)):
-           do_share_info.append(common_map[users[i]][questions[i]])
+           do_share_info.append(self.common_map[users[i]][questions[i]])
         return np.reshape(do_share_info, (len(users),1))
         
     def pca(self, components=(4400, 4300)):
@@ -219,6 +232,7 @@ class loadData:
         '''
         returns question, user latent factors using LightFM
         '''
+        print '\tcalculating latent factors...'
         q_index_map = {q['q_id']:i  for i,q in self.questions.iterrows()}
         u_index_map = {u['u_id']:i  for i,u in self.users.iterrows()}
         X = self.train.as_matrix(['q_id','u_id'])
@@ -232,17 +246,18 @@ class loadData:
             data.append(int(y[i]))
         train_matrix = scipy.sparse.csr_matrix((data, (row, column)),
                                                shape=(len(self.users),len(self.questions)))
-        model = LightFM(loss='warp-kos', max_sampled=15, no_components=10)
-        model.fit(train_matrix, epochs=10, num_threads=24)
+        model = LightFM(loss='warp-kos', max_sampled=12, no_components=10)
+        model.fit(train_matrix, epochs=15, num_threads=24)
         return model.user_embeddings, model.item_embeddings
         
 
-    def training_features(self, method='', other=None):
+    def dataset(self):
         '''
-        return features, label (X, y)
+        return Xtrain, y_train, Xval, Xtest
         '''
 
         # -------- USER FEATURES ---------------
+        print 'calculating user features...'
         user_latent_features, question_latent_features = self.latent_factors()
         user_features = np.hstack([self.user_question_score(),
                                    self.user_tag_vectors()])
@@ -250,6 +265,7 @@ class loadData:
 
 
         # -------- QUESTION FEATURES --------------
+        print 'calculating question features...'
         question_features = normalize(self.questions.as_matrix(['q_no_upvotes',
                                                                 'q_no_answers',
                                                                 'q_no_quality_answers']),axis=0)
@@ -270,40 +286,29 @@ class loadData:
         user_feat_map = {u['u_id']:i for i,u in self.users.iterrows()}
         question_feat_map = {q['q_id']:i for i,q in self.questions.iterrows()}
 
-        # return the features for validation or test files
-        if other is not None:
+        def _X_features(data):
+            print 'compiling features started... shape:',data.shape
             c_user_features = []
             c_question_features = []
-            data = self.test if other is 'test' else self.validation
+            
             for i, t in data.iterrows():
                 c_question_features.append(question_features[question_feat_map[t['q_id']], :])
                 c_user_features.append(user_features[user_feat_map[t['u_id']], :])
             #  -------- COMMON FEATURES ---------
             common_tag_info = self._do_share_tag(data['u_id'].tolist(), data['q_id'].tolist())
             return np.hstack([np.array(c_question_features),
-                              np.array(c_user_features), common_tag_info]), []
-                
-        train_user_features = []
-        train_question_features = []
-        labels = []
-        for i, t in self.train.iterrows():
-            train_question_features.append(question_features[question_feat_map[t['q_id']], :])
-            train_user_features.append(user_features[user_feat_map[t['u_id']], :])
-            labels.append(int(t['answered']))
+                              np.array(c_user_features), common_tag_info])
+        Xtrain = _X_features(self.train)
+        Xval = _X_features(self.validation)
+        Xtest = _X_features(self.test)
+        ytrain = np.array(map(lambda x:int(x), self.train['answered'].tolist()))
         
-        # ------- COMMON FEATURES ----------
-        common_tag_info = self._do_share_tag(self.train['u_id'].tolist(), self.train['q_id'].tolist())
-        
-        return np.hstack([np.array(train_question_features),
-                          np.array(train_user_features), common_tag_info]), np.array(labels)
+        return Xtrain, ytrain, Xval, Xtest
     
 if __name__ == '__main__':
     data = loadData('../../data')
-    # data.latent_factors()
-    # data.user_cosine_similarity()
-    # data.question_cosine_similarity()
-    # print data.question_tag_features()
-    data.training_features()
+    xtrain, ytrain, xval, xtest = data.dataset()
+    print 'Xtrain:{},ytrain:{}\nxval:{}\nxtest{}'.format(xtrain.shape, ytrain.shape, xval.shape, xtest.shape)
 
 
                                       

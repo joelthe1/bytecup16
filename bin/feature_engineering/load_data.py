@@ -220,6 +220,7 @@ class loadData:
             do_share_info = []
             for i in range(len(users)):
                 do_share_info.append(self.common_map[users[i]][questions[i]])
+            print '----->finished.'
             return np.reshape(do_share_info, (len(users),1))
         print 'computing common-tag features...'
         self.common_map = {}
@@ -321,7 +322,7 @@ class loadData:
         model = LightFM(loss='warp-kos', max_sampled=12, no_components=10)
         model.fit(train_matrix, epochs=15, num_threads=24)
         return model.user_embeddings, model.item_embeddings
-
+    
     def tag_tag_similarity(self):
         tag_word_list_map = {}
         for i,q in self.questions.iterrows():
@@ -389,22 +390,28 @@ class loadData:
         question_feat_map = {q['q_id']:i for i,q in self.questions.iterrows()}
 
         def _X_features(data):
-            print 'compiling features started... shape:',data.shape
+            print '\tcompiling features started... shape:',data.shape
             c_user_features = []
             c_question_features = []
             for i, t in data.iterrows():
                 c_question_features.append(question_features[question_feat_map[t['q_id']], :])
                 c_user_features.append(user_features[user_feat_map[t['u_id']], :])
             #  -------- COMMON FEATURES ---------
+            print '\t\tcalculating user_question_similarity...'
             user_question_similarity = self.user_question_similarity(data['u_id'].tolist(), data['q_id'].tolist())
+            print '\t\tcalculating common_tag_info...'
             common_tag_info = self._do_share_tag(data['u_id'].tolist(), data['q_id'].tolist())
+            print '\t\tcalculating qtag_utag correlations...'
             qtag_utag_corr = self.qtag_utag_correlation(data['u_id'].tolist(), data['q_id'].tolist())
             return np.hstack([np.array(c_question_features),
                               qtag_utag_corr,
                               np.array(c_user_features), common_tag_info, user_question_similarity])
         
+        print '----Xtrain----'
         Xtrain = _X_features(self.train)
+        print '----Xval------'
         Xval = _X_features(self.validation)
+        print '----Xtest-----'
         Xtest = _X_features(self.test)
         ytrain = np.array(map(lambda x:int(x), self.train['answered'].tolist()))
         

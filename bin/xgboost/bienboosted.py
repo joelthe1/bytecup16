@@ -21,30 +21,26 @@ import datetime
 class xgboost_wrapper:
     def __init__(self):
         data = loadData('../../data')
-        self.X, self.y = data.training_features()
+        self.X, self.y, self.X_valid, self.X_test = data.dataset()
 
-        # valid_q_mat, valid_u_mat = data.training_features(other='validation')
-        # self.X_valid = np.hstack([valid_q_mat, valid_u_mat])
-        # self.validate_ids_dataframe = data.validation
-        
-        # test_q_mat, test_u_mat = data.training_features(other='test')
-        # self.X_test = np.hstack([test_q_mat, test_u_mat])
-        # self.test_ids_df = data.test
+        self.validate_ids_dataframe = data.validation
+        self.test_ids_df = data.test
         
         self.model = None;
         
-        self.params = {'max_depth':6,
-                       'n_estimators':100,
-                       'learning_rate':0.03,
+        self.params = {'max_depth':11,
+                       'n_estimators':120,
+                       'learning_rate':0.2,
                        'silent':True,
                        'objective':'binary:logistic',
-                       'gamma':0.2,
-                       'min_child_weight':1,
+                       'gamma':0,
+                       'min_child_weight':7,
                        'max_delta_step':6,
-                       'subsample':0.8,
+                       'subsample':0.9,
                        'reg_lambda':3,
                        'reg_alpha':1,
-                       'scale_pos_weight':1}
+                       'scale_pos_weight':1,
+                       'colsample_bytree':0.9}
 
     def make_dir(self, path):
         try:
@@ -111,19 +107,39 @@ class xgboost_wrapper:
     def predict_validation(self):
         self.model = xgboost.XGBClassifier(**self.params).fit(self.X, self.y)
 
-        np.savetxt('imp_weigts.txt', np.array(self.model.feature_importances_))
-        return
-    
+        # np.savetxt('imp_weigts.txt', np.array(self.model.feature_importances_))
+        # return
+        
+        print 'Predicting validation.'
         y_pred = self.model.predict_proba(self.X_valid)
+        print y_pred
+        print 'completed.. Predicting validation.'
+
+        print 'Writing out validation.'
         wfile = open('temp.csv', 'w')
         wfile.write('qid,uid,label\n')
         for i,entry in enumerate(y_pred):
-            wfile.write(str(self.validate_ids_dataframe['q_id'][i]) +',' + str(self.validate_ids_dataframe['u_id'][i]) +','+str(entry[1])+'\n')
+            wfile.write(str(self.validate_ids_dataframe['q_id'][i]) +',' + str(self.validate_ids_dataframe['u_id'][i]) +',{0:.20f}\n'.format(entry[1]))
+        wfile.close()
+        print 'Completed.. writing out validation.'
+
+        print 'Predicting test.'
+	y_pred = self.model.predict_proba(self.X_test)
+        print 'Completed.. Predicting test.'
+
+        print 'Writing out test.'
+        wfile = open('final.csv', 'w')
+        wfile.write('qid,uid,label\n')
+        for i,entry in enumerate(y_pred):
+            wfile.write(str(self.test_ids_df['q_id'][i]) +',' + str(self.test_ids_df['u_id'][i]) +',{0:.20f}\n'.format(entry[1]))
+        wfile.close()
+        print 'Completed.. Writing out test.'
+
 
 if __name__ == '__main__':
     xg = xgboost_wrapper()
-    xg.cross_validate()
+#    xg.cross_validate()
 #    xg.grid_search()
-#    xg.predict_validation()
+    xg.predict_validation()
 
 

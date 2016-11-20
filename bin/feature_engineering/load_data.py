@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pickle
 from collections import Counter
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import CountVectorizer
@@ -240,6 +241,36 @@ class loadData:
         for i in range(len(users)):
            do_share_info.append(self.common_map[users[i]][questions[i]])
         return np.reshape(do_share_info, (len(users),1))
+
+    def get_id_rel(self, i, x):
+        freq_dict = pickle.load(open('freq_dict.pkl', 'r'))
+        max_val = 0
+        min_val = 0
+        log_val = 0
+        for v in x:
+            if v not in freq_dict[i]:
+                val = 0
+            else:
+                val = freq_dict[i][v]
+            if val > max_val:
+                max_val = val
+            if val < min_val:
+                min_val = val
+            log_val += np.log(1 + val)
+        return [max_val, min_val, log_val]
+
+    def qtag_utag_correlation(self, users, questions):
+        user_tag_map = {}
+        question_tag_map = {}
+        assert len(users)==len(questions)
+        for i,u in self.users.iterrows():
+            user_tag_map[u['u_id']]= u['e_expert_tags'].split('/')
+        for i,q in self.questions.iterrows():
+            question_tag_map[q['q_id']]=str(q['q_tag'])
+        proba = []
+        for i in range(len(users)):
+            proba.append(self.get_id_rel(question_tag_map[questions[i]], user_tag_map[users[i]]))
+        return np.array(proba)
         
     def pca(self, components=(4400, 4300)):
         '''
@@ -367,7 +398,9 @@ class loadData:
             #  -------- COMMON FEATURES ---------
             user_question_similarity = self.user_question_similarity(data['u_id'].tolist(), data['q_id'].tolist())
             common_tag_info = self._do_share_tag(data['u_id'].tolist(), data['q_id'].tolist())
+            qtag_utag_corr = self.qtag_utag_correlation(data['u_id'].tolist(), data['q_id'].tolist())
             return np.hstack([np.array(c_question_features),
+                              qtag_utag_corr,
                               np.array(c_user_features), common_tag_info, user_question_similarity])
         
         Xtrain = _X_features(self.train)

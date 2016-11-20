@@ -1,11 +1,13 @@
 import numpy as np
 import pandas as pd
+from collections import Counter
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.preprocessing import normalize
 from sklearn.decomposition import NMF
-from scipy.stats import zscore, kurtosis
+from scipy.stats import zscore, kurtosis, skew
+from scipy.spatial import distance
 import scipy.sparse
 from lightfm import LightFM
 
@@ -48,7 +50,7 @@ class loadData:
                                ngram_range=ngram).fit_transform(documents).toarray()
     
     def _tfidf(self, vocabulary, documents, ngram=(1, 1)):
-        count_vectors = CountVectorizer(vocabulary=vocabulary, token_pattern=u'(?u)\\b\\w+\\b',
+        count_vectors = CountVectorizer(vocabulary=vocabulary, token_pattern=u'(?u)\\b\\w+\\b', min_df=.10, max_df=.75,
                                         ngram_range=ngram).fit_transform(documents)
         tf_vectors = TfidfTransformer(use_idf=True, norm='l2').fit_transform(count_vectors)
         return tf_vectors.todense()
@@ -72,7 +74,7 @@ class loadData:
         for i, u in self.users.iterrows():
             questions_answered = user_question_train_map_one.get(u['u_id'], [])
             questions_not_answered = user_question_train_map_zero.get(u['u_id'], [])
-            tag_vector_template = np.zeros(len(self.topic_vocabulary)+3)
+            tag_vector_template = np.zeros(len(self.topic_vocabulary)+4)
             for q in questions_answered:
                 tag_vector_template[tag_index_map[question_tag_map[q]]] += 1
             for q in questions_not_answered:
@@ -80,11 +82,22 @@ class loadData:
             # add 3 features --- number of questions answered,
             # number of questions not answered,
             # total expert tags per user
+            tag_vector_template[-4] = len(u['e_desc_word_seq'].split('/'))
             tag_vector_template[-3] = len(questions_answered)
             tag_vector_template[-2] = len(questions_not_answered)
             tag_vector_template[-1] = len(u['e_expert_tags'].split('/'))            
             user_tag_features.append(tag_vector_template)
-        return normalize(axis=0, X=np.array(user_tag_features))
+        # find prior of answering for each user
+        prior = []
+        for u in self.users['u_id'].tolist():
+            if u in user_question_train_map_one:
+                prior.append(len(user_question_train_map_one[u])/float(len(user_question_train_map_one[u])
+                                                                  +len(user_question_train_map_zero.get(u,[]))))
+            else:
+                prior.append(0.0)
+        neg_prior = np.reshape(map(lambda x:1-x, prior), (len(prior),1))
+        prior = np.reshape(prior, (len(prior),1))
+        return np.hstack([normalize(axis=0, X=np.array(user_tag_features)),neg_prior,prior])
 
     def question_tag_features(self):
         tag_question_map = {}
@@ -105,8 +118,21 @@ class loadData:
                                                kurtosis(tag_features, axis=0)])
             tag_feature_matrix.append(tag_features_template)
             tag_total_array.append(tag_total_answers[tag])
-            
-        return np.hstack([np.array(tag_feature_matrix),
+
+        #find the prior of answering each question
+        question_count_map = Counter(self.train['q_id'].tolist())
+        question_ans_count_map = {}
+        prior = []
+        for i,t in self.train.iterrows():
+            question_ans_count_map[t['q_id']] = question_ans_count_map.get(t['q_id'],0)+int(t['answered'])
+        for q in self.questions['q_id'].tolist():
+            if q in question_ans_count_map:
+                prior.append(question_ans_count_map[q]/float(question_count_map[q]))
+            else:
+                prior.append(0.0)
+        prior = np.reshape(prior, (len(prior),1))
+        
+        return np.hstack([np.array(tag_feature_matrix), prior,
                           np.reshape(tag_total_array, (len(self.questions),1))])
 
     def user_question_score(self):
@@ -127,6 +153,7 @@ class loadData:
             q_not = np.array(user_question_train_map_zero.get(u['u_id'], [[0,0,0]]))
             user_features_template = np.hstack([np.median(q_answered, axis=0),
                                                 np.mean(q_answered, axis=0),
+                                                skew(q_answered, axis=0),
                                                 np.ndarray.min(q_answered, axis=0),
                                                 np.ndarray.max(q_answered, axis=0),
                                                 kurtosis(q_answered, axis=0),
@@ -134,6 +161,7 @@ class loadData:
                                                 np.mean(q_not, axis=0),
                                                 np.ndarray.min(q_not, axis=0),
                                                 np.ndarray.max(q_not, axis=0),
+                                                skew(q_not, axis=0),
                                                 kurtosis(q_not, axis=0)])
             user_question_median_features.append(user_features_template)
         return normalize(axis=0, X=np.array(user_question_median_features))
@@ -249,8 +277,30 @@ class loadData:
         model = LightFM(loss='warp-kos', max_sampled=12, no_components=10)
         model.fit(train_matrix, epochs=15, num_threads=24)
         return model.user_embeddings, model.item_embeddings
-        
 
+    def tag_tag_similarity(self):
+        tag_word_list_map = {}
+        for i,q in self.questions.iterrows():
+            tag_word_list_map[q['q_tag']] = q['q_word_seq']+'/'+tag_word_list_map.setdefault(q['q_tag'], '999999999')
+        tag_word_documents = []
+        for i,q in self.questions.iterrows():
+            tag_word_documents.append(tag_word_list_map[q['q_tag']])
+        tfidf_vectors = self._tfidf(self.word_vocabulary, tag_word_documents)
+        tag_tag_similarity = (tfidf_vectors*tfidf_vectors.T).A
+        return tag_tag_similarity
+
+    def user_question_similarity(self, users, questions):
+        assert len(questions)==len(users)
+        user_word_features = self._count_vector(self.word_vocabulary, self.users['e_desc_word_seq'])
+        question_word_features = self._count_vector(self.word_vocabulary, self.questions['q_word_seq'])
+        q_index_map = {q['q_id']:i  for i,q in self.questions.iterrows()}
+        u_index_map = {u['u_id']:i  for i,u in self.users.iterrows()}
+        values = []
+        for i in range(len(users)):
+            values.append(distance.correlation(user_word_features[u_index_map[users[i]]],
+                                   question_word_features[q_index_map[questions[i]]]))                          
+        return np.reshape(values, (len(users),1))
+        
     def dataset(self):
         '''
         return Xtrain, y_train, Xval, Xtest
@@ -261,9 +311,11 @@ class loadData:
         user_latent_features, question_latent_features = self.latent_factors()
         user_features = np.hstack([self.user_question_score(),
                                    self.user_tag_vectors()])
-        user_features = np.hstack([user_features, user_latent_features])
-
-
+        user_char_desc_len = np.reshape([len(char_des.split('/'))
+                                         for char_des in self.users['e_desc_char_seq'].tolist()],
+                                        (len(self.users),1))
+        user_features = np.hstack([user_features, user_latent_features, user_char_desc_len])
+        
         # -------- QUESTION FEATURES --------------
         print 'calculating question features...'
         question_features = normalize(self.questions.as_matrix(['q_no_upvotes',
@@ -271,17 +323,23 @@ class loadData:
                                                                 'q_no_quality_answers']),axis=0)
         question_tag_vectors = np.array(self._count_vector(self.topic_vocabulary,
                                                            map(lambda x:str(x), self.questions['q_tag'].tolist())))
-        question_length_vectors = np.reshape([ len(each.split('/')) for each in self.questions['q_word_seq'].tolist()]
+        question_length_vectors = np.reshape([ len(each.split('/'))
+                                               for each in self.questions['q_word_seq'].tolist()]
                                     , (len(self.questions),1))
         question_quality_vectors = np.reshape([q/float(a) if a>0 else 0.0 for a,q in self.questions.as_matrix(['q_no_answers', 'q_no_quality_answers'])],
                                               (len(self.questions),1))
+        question_char_desc_len = np.reshape([len(desc.split('/'))
+                                             for desc in self.questions['q_char_seq']],
+                                            (len(self.questions),1))
         question_features = np.hstack([question_features,question_tag_vectors,
+                                       question_char_desc_len,
                                        question_length_vectors,
                                        self.question_tag_features(),
                                        question_quality_vectors])
         
-        # question_features = np.hstack([question_features, self.question_cosine_similarity()])
+        question_features = np.hstack([question_features, self.question_cosine_similarity()])
         question_features = np.hstack([question_features, question_latent_features])
+        question_features = np.hstack([question_features, self.tag_tag_similarity()])
 
         user_feat_map = {u['u_id']:i for i,u in self.users.iterrows()}
         question_feat_map = {q['q_id']:i for i,q in self.questions.iterrows()}
@@ -290,14 +348,15 @@ class loadData:
             print 'compiling features started... shape:',data.shape
             c_user_features = []
             c_question_features = []
-            
             for i, t in data.iterrows():
                 c_question_features.append(question_features[question_feat_map[t['q_id']], :])
                 c_user_features.append(user_features[user_feat_map[t['u_id']], :])
             #  -------- COMMON FEATURES ---------
+            user_question_similarity = self.user_question_similarity(data['u_id'].tolist(), data['q_id'].tolist())
             common_tag_info = self._do_share_tag(data['u_id'].tolist(), data['q_id'].tolist())
             return np.hstack([np.array(c_question_features),
-                              np.array(c_user_features), common_tag_info])
+                              np.array(c_user_features), common_tag_info, user_question_similarity])
+        
         Xtrain = _X_features(self.train)
         Xval = _X_features(self.validation)
         Xtest = _X_features(self.test)

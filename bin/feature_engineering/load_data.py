@@ -376,10 +376,19 @@ class loadData:
         ytrain = np.array(map(lambda x:int(x), self.train['answered'].tolist()))
         
         return Xtrain, ytrain, Xval, Xtest
+
+    def dataset_with_preprocessing(self):
+        Xtrain, ytrain, Xval, Xtest = self.dataset()
+        columns_to_consider = []
+        for i in range(len(Xtrain[0])):
+            if len(np.unique(Xtrain[:,i])) > 1:
+                columns_to_consider.append(i)
+        return Xtrain[:, columns_to_consider], ytrain, Xval[:, columns_to_consider], Xtest[:, columns_to_consider]
+        
     
 if __name__ == '__main__':
     data = loadData('../../data')
-    xtrain, ytrain, xval, xtest = data.dataset()
+    xtrain, ytrain, xval, xtest = data.dataset_with_preprocessing()
     print 'Xtrain:{},ytrain:{}\nxval:{}\nxtest{}'.format(xtrain.shape, ytrain.shape, xval.shape, xtest.shape)
 
 

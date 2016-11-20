@@ -33,6 +33,7 @@ class loadData:
         self.test = pd.read_csv(path + "/test_nolabel.txt", names=testcolumns, sep=',', skiprows=1)
         self.common_map = None
         self._vocabulary()
+        self.freq_dict = pickle.load(open('freq_dict.pkl', 'r'))
 
     def __repr__(self):
         return 'No of questions:{}\n No of users:{}\nNo of training examples:{}'.format(len(self.questions),
@@ -244,15 +245,14 @@ class loadData:
         return np.reshape(do_share_info, (len(users),1))
 
     def get_id_rel(self, i, x):
-        freq_dict = pickle.load(open('freq_dict.pkl', 'r'))
         max_val = 0
         min_val = 0
         log_val = 0
         for v in x:
-            if v not in freq_dict[i]:
+            if v not in self.freq_dict[i]:
                 val = 0
             else:
-                val = freq_dict[i][v]
+                val = self.freq_dict[i][v]
             if val > max_val:
                 max_val = val
             if val < min_val:

@@ -140,11 +140,14 @@ class loadData:
         Return the median of upvotes,ans,no_quality_ans, the questions answered by a user.
         '''
         user_question_train_map_one = {}
+        user_question_answered ={}
         user_question_train_map_zero = {}
+        
         question_tag_map = {t['q_id']:[t['q_no_upvotes'],t['q_no_answers'],t['q_no_quality_answers']] for i,t in self.questions.iterrows()}
         for i, t in self.train.iterrows():
             if int(t['answered']) == 1:
                 user_question_train_map_one.setdefault(t['u_id'], []).append(question_tag_map[t['q_id']])
+                user_question_answered.setdefault(t['u_id'],[]).append(t['q_id'])
             else:
                 user_question_train_map_zero.setdefault(t['u_id'], []).append(question_tag_map[t['q_id']])
         user_question_median_features = []
@@ -164,7 +167,17 @@ class loadData:
                                                 skew(q_not, axis=0),
                                                 kurtosis(q_not, axis=0)])
             user_question_median_features.append(user_features_template)
-        return normalize(axis=0, X=np.array(user_question_median_features))
+        #create a common map if not present
+        count_out_domain = []
+        self._do_share_tag(self.train['u_id'].tolist(), self.train['q_id'].tolist())
+        for u in self.users['u_id'].tolist():
+            count_temp = 0
+            for q in user_question_answered.get(u,[]):
+                if u in self.common_map and q in self.common_map[u] and self.common_map[u][q] != 1:
+                    count_temp += (1.0/len(user_question_answered[u]))
+            count_out_domain.append(count_temp)
+        count_out_domain = np.reshape(count_out_domain, (len(self.users),1))
+        return np.hstack([normalize(axis=0, X=np.array(user_question_median_features)),count_out_domain])
             
     def weighted_word_vectors(self, pca=None):
         '''

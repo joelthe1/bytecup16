@@ -379,6 +379,7 @@ class loadData:
 
     def dataset_with_preprocessing(self):
         Xtrain, ytrain, Xval, Xtest = self.dataset()
+        print 'removing columns with less than 2 unique value...'
         columns_to_consider = []
         for i in range(len(Xtrain[0])):
             if len(np.unique(Xtrain[:,i])) > 1:

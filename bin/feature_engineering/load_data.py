@@ -419,11 +419,24 @@ class loadData:
 
     def dataset_with_preprocessing(self):
         Xtrain, ytrain, Xval, Xtest = self.dataset()
-        print 'removing columns with less than 2 unique value...'
-        columns_to_consider = []
-        for i in range(len(Xtrain[0])):
-            if len(np.unique(Xtrain[:,i])) > 1:
-                columns_to_consider.append(i)
+        print 'removing low quality features...'
+        # columns_to_consider = []
+        # for i in range(len(Xtrain[0])):
+        #     if len(np.unique(Xtrain[:,i])) > 1:
+        #         columns_to_consider.append(i)
+        # features based on weights from XGBOOST
+        columns_to_consider =[0, 1, 2, 3, 5, 16, 27, 38, 53, 54, 57, 58, 69, 80, 91, 102,
+                              113, 124, 135, 146, 147, 148, 149, 150, 151, 152, 153, 155,
+                              157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168,
+                              169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181,
+                              182, 183, 185, 186, 187, 188, 189, 190, 192, 193, 194, 195, 196,
+                              197, 198, 201, 205, 208, 209, 214, 215, 221, 222, 235, 239, 241,
+                              269, 271, 277, 296, 298, 304, 337, 8271, 8273, 8274, 8275, 8276,
+                              8277, 8278, 8279, 8280, 8281, 8282, 8283, 8284, 8285, 8286, 8287,
+                              8288, 8289, 8290, 8291, 8292, 8293, 8294, 8295, 8296, 8297, 8298,
+                              8299, 8300, 8301, 8302, 8303, 8304, 8305, 8306, 8307, 8308, 8309, 8310, 8331, 8332,
+                              8333, 8372, 8373, 8404, 8405, 8416, 8417, 8418, 8419, 8420, 8421, 8422, 8423, 8424, 8425, 8438,
+                              8439, 8454, 8455, 8456, 8457, 8458, 8459, 8460, 8461, 8462, 8463, 8464, 8465, 8466, 8467, 8468, 8469, 8470, 8472]
         return Xtrain[:, columns_to_consider], ytrain, Xval[:, columns_to_consider], Xtest[:, columns_to_consider]
         
     
